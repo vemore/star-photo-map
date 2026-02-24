@@ -5,4 +5,6 @@ data.db
 *.db-journal
 *.db-wal
 *.log
+*.db-shm
 .vite/
+.playwright-mcp/
