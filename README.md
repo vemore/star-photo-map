@@ -1,16 +1,17 @@
 # Carte du Ciel Étoilé
 
-Application web interactive pour cartographier des photos d'étoiles sur une représentation du ciel de l'hémisphère nord.
+Application web interactive pour superposer des astrophotographies sur une carte céleste.
 
-L'utilisateur uploade une photo du ciel nocturne, identifie 3 étoiles dessus, et la photo est automatiquement positionnée (rotation, échelle, translation) sur la carte céleste grâce à une transformation affine.
+L'utilisateur uploade une photo du ciel nocturne, et l'application la positionne automatiquement sur la carte grâce à un plate solver intégré (ou manuellement via identification de 3 étoiles). La photo est alors affichée avec la bonne rotation, échelle et position grâce à une transformation affine.
 
 ## Fonctionnalités
 
-- **Carte céleste interactive** — ~5000 étoiles avec couleurs (indice B-V), constellations, grille RA/Dec
+- **Carte céleste interactive** — ~41 000 étoiles (jusqu'à mag 8) avec couleurs (indice B-V), constellations, grille RA/Dec, couverture complète du ciel
 - **Projection stéréographique polaire** — Pôle Nord Céleste au centre, équateur au bord
-- **Upload de photos** — Identification de 3 étoiles par recherche (nom propre, désignation Bayer)
-- **Positionnement automatique** — Transformation affine 3 points → CSS `matrix()`
-- **Zoom & pan** — Molette + clic-glisser
+- **Plate solving automatique** — Résolution locale par triangulation (hash de triangles d'étoiles) ou via Astrometry.net
+- **Upload de photos** — Positionnement automatique ou manuel (identification de 3 étoiles par recherche)
+- **Positionnement précis** — Transformation affine 3 points → CSS `matrix()`
+- **Zoom & pan** — Molette + clic-glisser, étoiles faibles apparaissent progressivement
 - **Tooltips** — Nom, magnitude et constellation au survol des étoiles
 - **Persistance** — Backend Express + SQLite, photos stockées sur disque
 
@@ -71,6 +72,7 @@ src/
   main.ts              # Point d'entrée frontend
   sky-map.ts           # Rendu Canvas (étoiles, constellations, grille)
   photo-overlay.ts     # Upload, marquage, positionnement photos
+  plate-solver.ts      # Résolution locale par triangulation (hash index)
   projection.ts        # Projection stéréographique polaire
   affine.ts            # Transformation affine 3 points → CSS matrix
   star-catalog.ts      # Chargement des données célestes
@@ -82,8 +84,10 @@ src/
 server/
   index.ts             # Serveur Express, routes API
   db.ts                # Schéma SQLite et requêtes
+  astrometry.ts        # Intégration Astrometry.net (plate solving distant)
+  wcs-reader.ts        # Lecture des solutions WCS
 public/data/
-  stars.6.json         # ~5000 étoiles (d3-celestial)
+  stars.8.json         # ~41 000 étoiles jusqu'à mag 8 (d3-celestial)
   constellations.lines.json
   constellations.json
   starnames.json
