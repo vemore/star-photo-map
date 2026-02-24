@@ -63,3 +63,30 @@ export interface ViewState {
   width: number;
   height: number;
 }
+
+export interface DetectedSpot {
+  x: number;           // pixel X (in the downscaled image)
+  y: number;           // pixel Y
+  brightness: number;  // sum of intensities in the component
+  size: number;        // number of pixels
+}
+
+export interface StarDetectionResult {
+  spots: DetectedSpot[];
+  imageWidth: number;
+  imageHeight: number;
+  scaleFromOriginal: number; // ratio analysed size / original size
+}
+
+export interface PlateSolveResult {
+  success: boolean;
+  correspondences?: PhotoCorrespondence[];
+  error?: string;
+}
+
+export interface AstrometrySolveStatus {
+  jobId: string;
+  status: 'pending' | 'solving' | 'solved' | 'failed' | 'timeout';
+  correspondences?: PhotoCorrespondence[];
+  error?: string;
+}

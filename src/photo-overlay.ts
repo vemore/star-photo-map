@@ -3,7 +3,9 @@ import { project, toCanvas } from './projection';
 import { computeAffineTransform, affineToCSS } from './affine';
 import { getStarByHip } from './star-catalog';
 import { searchStars } from './search';
-import { uploadPhoto, deletePhotoAPI } from './api';
+import { uploadPhoto, deletePhotoAPI, solveWCS, submitPlateSolve, pollPlateSolve } from './api';
+import { detectStarsFromFile } from './star-detector';
+import { solvePlate } from './plate-solver';
 import type { SkyMap } from './sky-map';
 
 const MARKER_COLORS = ['#ff4444', '#44cc44', '#4488ff'];
@@ -91,7 +93,7 @@ export class PhotoOverlay {
   openRegistrationModal() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    input.accept = 'image/*,.tif,.tiff,.fits,.fit';
     input.onchange = () => {
       const file = input.files?.[0];
       if (file) this.showModal(file);
@@ -200,6 +202,81 @@ export class PhotoOverlay {
     instructions.className = 'modal-instructions';
     instructions.textContent = 'Cliquez sur 3 étoiles dans la photo, puis identifiez chacune.';
     formSide.appendChild(instructions);
+
+    // --- Auto-solve section ---
+    const fileExt = file.name.toLowerCase().replace(/^.*(\.[^.]+)$/, '$1');
+    const isAstroFile = ['.tif', '.tiff', '.fits', '.fit'].includes(fileExt);
+
+    const autoSection = document.createElement('div');
+    autoSection.className = 'auto-solve-section';
+
+    const autoTitle = document.createElement('div');
+    autoTitle.className = 'auto-solve-title';
+    autoTitle.textContent = 'Résolution automatique';
+    autoSection.appendChild(autoTitle);
+
+    const autoBtns = document.createElement('div');
+    autoBtns.className = 'auto-solve-buttons';
+
+    // WCS button (only for TIFF/FITS)
+    const btnWCS = document.createElement('button');
+    btnWCS.type = 'button';
+    btnWCS.className = 'btn-auto-solve';
+    btnWCS.textContent = 'Métadonnées (WCS)';
+    btnWCS.disabled = !isAstroFile;
+    btnWCS.title = isAstroFile ? 'Lire les données WCS du fichier' : 'Disponible pour les fichiers TIFF/FITS';
+    autoBtns.appendChild(btnWCS);
+
+    // Online button
+    const btnOnline = document.createElement('button');
+    btnOnline.type = 'button';
+    btnOnline.className = 'btn-auto-solve';
+    btnOnline.textContent = 'En ligne (astrometry.net)';
+    autoBtns.appendChild(btnOnline);
+
+    // Local solve button
+    const btnLocal = document.createElement('button');
+    btnLocal.type = 'button';
+    btnLocal.className = 'btn-auto-solve full-width';
+    btnLocal.textContent = 'Résoudre localement';
+    autoBtns.appendChild(btnLocal);
+
+    autoSection.appendChild(autoBtns);
+
+    // Status area
+    const autoStatus = document.createElement('div');
+    autoStatus.className = 'auto-solve-status';
+    autoSection.appendChild(autoStatus);
+
+    formSide.appendChild(autoSection);
+
+    // Separator
+    const separator = document.createElement('div');
+    separator.className = 'auto-solve-separator';
+    separator.textContent = 'ou identification manuelle';
+    formSide.appendChild(separator);
+
+    // Helper: set auto-solve status
+    function setAutoStatus(msg: string, state: 'solving' | 'success' | 'failed') {
+      autoStatus.className = `auto-solve-status visible ${state}`;
+      if (state === 'solving') {
+        autoStatus.innerHTML = `<span class="auto-solve-spinner"></span>${msg}`;
+      } else {
+        autoStatus.textContent = msg;
+      }
+    }
+
+    function disableAutoButtons() {
+      btnWCS.disabled = true;
+      btnOnline.disabled = true;
+      btnLocal.disabled = true;
+    }
+
+    function enableAutoButtons() {
+      btnWCS.disabled = !isAstroFile;
+      btnOnline.disabled = false;
+      btnLocal.disabled = false;
+    }
 
     // 3 point entries
     const pointEntries: HTMLDivElement[] = [];
@@ -445,6 +522,155 @@ export class PhotoOverlay {
       const allDone = points.every(p => p && p.starHip !== 0);
       submitBtn.disabled = !allDone;
     }
+
+    // --- Auto-solve: apply result ---
+    function applyAutoSolveResult(correspondences: PhotoCorrespondence[]) {
+      if (!naturalWidth || !naturalHeight) return;
+
+      const scaleX = photoImg.offsetWidth / naturalWidth;
+      const scaleY = photoImg.offsetHeight / naturalHeight;
+
+      for (const corr of correspondences) {
+        const idx = corr.pointIndex;
+        if (idx < 0 || idx >= 3) continue;
+
+        const dispX = corr.photoX * scaleX;
+        const dispY = corr.photoY * scaleY;
+
+        placeMarker(idx, dispX, dispY, corr.photoX, corr.photoY);
+
+        const star = getStarByHip(corr.starHip);
+        if (star) {
+          selectStar(idx, star, corr.starName || starDisplayLabel(star));
+        } else {
+          // Star not in client catalog, use server-provided name
+          if (!points[idx]) continue;
+          points[idx]!.starHip = corr.starHip;
+          points[idx]!.starName = corr.starName;
+          statusLabels[idx].textContent = corr.starName;
+          statusLabels[idx].className = 'point-status point-complete';
+          searchInputs[idx].value = corr.starName;
+          searchInputs[idx].disabled = true;
+          pointEntries[idx].classList.add('complete');
+          if (pickBtns[idx]) pickBtns[idx].disabled = true;
+          updateActiveIndex();
+          checkComplete();
+        }
+      }
+    }
+
+    // --- WCS button handler ---
+    btnWCS.addEventListener('click', async () => {
+      disableAutoButtons();
+      setAutoStatus('Lecture des métadonnées WCS…', 'solving');
+
+      try {
+        const result = await solveWCS(file);
+        if (result.success && result.correspondences) {
+          setAutoStatus('Métadonnées WCS trouvées !', 'success');
+          applyAutoSolveResult(result.correspondences);
+        } else {
+          setAutoStatus(result.error || 'Aucune donnée WCS trouvée', 'failed');
+          enableAutoButtons();
+        }
+      } catch (err: any) {
+        setAutoStatus(err.message, 'failed');
+        enableAutoButtons();
+      }
+    });
+
+    // --- Online solve button handler ---
+    btnOnline.addEventListener('click', async () => {
+      disableAutoButtons();
+      const startTime = Date.now();
+      let timerInterval: ReturnType<typeof setInterval> | null = null;
+
+      function updateTimer() {
+        const elapsed = Math.round((Date.now() - startTime) / 1000);
+        setAutoStatus(`Résolution en cours… (${elapsed}s)`, 'solving');
+      }
+
+      updateTimer();
+      timerInterval = setInterval(updateTimer, 1000);
+
+      try {
+        const { jobId } = await submitPlateSolve(file);
+
+        // Poll with backoff
+        const delays = [3000, 5000, 8000, 13000, 13000, 13000, 13000, 13000];
+        let attempt = 0;
+
+        while (attempt < delays.length) {
+          await new Promise(r => setTimeout(r, delays[attempt]));
+          attempt++;
+
+          const status = await pollPlateSolve(jobId);
+
+          if (status.status === 'solved' && status.correspondences) {
+            if (timerInterval) clearInterval(timerInterval);
+            const elapsed = Math.round((Date.now() - startTime) / 1000);
+            setAutoStatus(`Résolu en ${elapsed}s !`, 'success');
+            applyAutoSolveResult(status.correspondences);
+            return;
+          } else if (status.status === 'failed' || status.status === 'timeout') {
+            if (timerInterval) clearInterval(timerInterval);
+            setAutoStatus(status.error || 'Résolution échouée', 'failed');
+            enableAutoButtons();
+            return;
+          }
+        }
+
+        // Timeout
+        if (timerInterval) clearInterval(timerInterval);
+        setAutoStatus('Timeout : la résolution a pris trop de temps', 'failed');
+        enableAutoButtons();
+      } catch (err: any) {
+        if (timerInterval) clearInterval(timerInterval);
+        setAutoStatus(err.message, 'failed');
+        enableAutoButtons();
+      }
+    });
+
+    // --- Local solve button handler ---
+    btnLocal.addEventListener('click', async () => {
+      disableAutoButtons();
+      setAutoStatus('Détection des étoiles…', 'solving');
+
+      try {
+        const detection = await detectStarsFromFile(file);
+        const spotCount = detection.spots.length;
+
+        if (spotCount < 3) {
+          setAutoStatus('Pas assez d\'étoiles détectées dans l\'image', 'failed');
+          enableAutoButtons();
+          return;
+        }
+
+        setAutoStatus(`${spotCount} étoiles détectées. Recherche de correspondances…`, 'solving');
+
+        // Use setTimeout to let the UI update before the CPU-heavy solve
+        await new Promise(r => setTimeout(r, 50));
+
+        const result = await solvePlate(detection.spots, detection.imageWidth, detection.imageHeight);
+
+        if (result.success && result.correspondences) {
+          // Scale correspondences from detection size to original image size
+          const scaledCorrespondences = result.correspondences.map(c => ({
+            ...c,
+            photoX: c.photoX * detection.scaleFromOriginal,
+            photoY: c.photoY * detection.scaleFromOriginal,
+          }));
+          setAutoStatus('Résolution locale réussie !', 'success');
+          applyAutoSolveResult(scaledCorrespondences);
+        } else {
+          setAutoStatus(result.error || 'Aucune solution trouvée', 'failed');
+          enableAutoButtons();
+        }
+      } catch (err: any) {
+        setAutoStatus(err.message, 'failed');
+        enableAutoButtons();
+      }
+    });
 
     submitBtn.addEventListener('click', async () => {
       submitBtn.disabled = true;

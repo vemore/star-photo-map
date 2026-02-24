@@ -464,3 +464,116 @@ html, body {
 .modal-cancel:hover {
   background: rgba(40, 40, 80, 0.3);
 }
+
+/* ─── Auto-solve section ─── */
+.auto-solve-section {
+  background: rgba(20, 20, 50, 0.5);
+  border: 1px solid rgba(60, 60, 140, 0.3);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.auto-solve-title {
+  font-size: 12px;
+  color: #88a;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.auto-solve-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.btn-auto-solve {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 10px;
+  background: rgba(70, 50, 150, 0.5);
+  border: 1px solid rgba(100, 80, 200, 0.4);
+  color: #bbc;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.btn-auto-solve:hover:not(:disabled) {
+  background: rgba(90, 70, 180, 0.7);
+  color: #ddf;
+}
+
+.btn-auto-solve:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-auto-solve.full-width {
+  flex-basis: 100%;
+}
+
+.auto-solve-status {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  display: none;
+}
+
+.auto-solve-status.visible {
+  display: block;
+}
+
+.auto-solve-status.solving {
+  background: rgba(40, 60, 140, 0.3);
+  border: 1px solid rgba(60, 80, 180, 0.3);
+  color: #99c;
+}
+
+.auto-solve-status.success {
+  background: rgba(30, 80, 40, 0.3);
+  border: 1px solid rgba(50, 120, 60, 0.3);
+  color: #8c8;
+}
+
+.auto-solve-status.failed {
+  background: rgba(100, 30, 30, 0.3);
+  border: 1px solid rgba(140, 50, 50, 0.3);
+  color: #c88;
+}
+
+.auto-solve-spinner {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(120, 120, 200, 0.3);
+  border-top-color: #99c;
+  border-radius: 50%;
+  animation: auto-solve-spin 0.8s linear infinite;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+
+@keyframes auto-solve-spin {
+  to { transform: rotate(360deg); }
+}
+
+.auto-solve-separator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: #667;
+}
+
+.auto-solve-separator::before,
+.auto-solve-separator::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(60, 60, 120, 0.3);
+}

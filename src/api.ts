@@ -1,4 +1,4 @@
-import type { Photo, PhotoCorrespondence } from './types';
+import type { Photo, PhotoCorrespondence, PlateSolveResult, AstrometrySolveStatus } from './types';
 
 export async function uploadPhoto(
   file: File,
@@ -30,4 +30,44 @@ export async function getPhotos(): Promise<Photo[]> {
 export async function deletePhotoAPI(id: string): Promise<void> {
   const res = await fetch(`/api/photos/${id}`, { method: 'DELETE' });
   if (!res.ok) throw new Error('Impossible de supprimer la photo');
+}
+
+export async function solveWCS(file: File): Promise<PlateSolveResult> {
+  const formData = new FormData();
+  formData.append('photo', file);
+
+  const res = await fetch('/api/solve-wcs', {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Erreur WCS : ${text}`);
+  }
+
+  return res.json();
+}
+
+export async function submitPlateSolve(file: File): Promise<{ jobId: string }> {
+  const formData = new FormData();
+  formData.append('photo', file);
+
+  const res = await fetch('/api/solve-plate', {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error || 'Échec de la soumission');
+  }
+
+  return res.json();
+}
+
+export async function pollPlateSolve(jobId: string): Promise<AstrometrySolveStatus> {
+  const res = await fetch(`/api/solve-plate/${jobId}`);
+  if (!res.ok) throw new Error('Impossible de récupérer le statut');
+  return res.json();
 }

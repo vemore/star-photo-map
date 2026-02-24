@@ -6,6 +6,8 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { createPhoto, getAllPhotos, deletePhoto, getPhotoFilename } from './db.js';
+import { extractWCS, wcsToCorrespondences, loadServerCatalog } from './wcs-reader.js';
+import { submitJob, getJobStatus, isConfigured as isAstrometryConfigured } from './astrometry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
@@ -137,6 +139,123 @@ app.delete('/api/photos/:id', (req, res) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// --- WCS solve route ---
+app.post('/api/solve-wcs', upload.single('photo'), async (req, res) => {
+  try {
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ success: false, error: 'Aucun fichier fourni' });
+      return;
+    }
+
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (!['.tif', '.tiff', '.fits', '.fit'].includes(ext)) {
+      res.status(400).json({ success: false, error: 'Format non supporté. Utilisez TIFF ou FITS.' });
+      return;
+    }
+
+    const wcs = extractWCS(file.buffer, ext);
+    if (!wcs) {
+      res.json({ success: false, error: 'Aucune donnée WCS trouvée dans le fichier' });
+      return;
+    }
+
+    // Get image dimensions
+    let imageWidth = wcs.NAXIS1;
+    let imageHeight = wcs.NAXIS2;
+
+    // For TIFF, try to get dimensions from sharp if NAXIS not in header
+    if ((ext === '.tif' || ext === '.tiff') && (!imageWidth || !imageHeight)) {
+      try {
+        const metadata = await sharp(file.buffer).metadata();
+        imageWidth = metadata.width || imageWidth;
+        imageHeight = metadata.height || imageHeight;
+      } catch {
+        // Ignore sharp errors
+      }
+    }
+
+    if (!imageWidth || !imageHeight) {
+      res.json({ success: false, error: 'Dimensions de l\'image introuvables' });
+      return;
+    }
+
+    loadServerCatalog();
+    const correspondences = wcsToCorrespondences(wcs, imageWidth, imageHeight);
+
+    if (correspondences.length < 3) {
+      res.json({ success: false, error: 'Pas assez d\'étoiles du catalogue dans le champ' });
+      return;
+    }
+
+    res.json({ success: true, correspondences });
+  } catch (err: any) {
+    console.error('WCS solve error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// --- Astrometry.net plate solve routes ---
+app.post('/api/solve-plate', upload.single('photo'), async (req, res) => {
+  try {
+    if (!isAstrometryConfigured()) {
+      res.status(400).json({ error: 'ASTROMETRY_API_KEY non configurée sur le serveur' });
+      return;
+    }
+
+    const file = req.file;
+    if (!file) {
+      res.status(400).json({ error: 'Aucun fichier fourni' });
+      return;
+    }
+
+    // Get image dimensions for calibration conversion later
+    let imageWidth = 0;
+    let imageHeight = 0;
+    try {
+      const metadata = await sharp(file.buffer).metadata();
+      imageWidth = metadata.width || 0;
+      imageHeight = metadata.height || 0;
+    } catch {
+      // For non-image formats, try to extract from FITS header
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (ext === '.fits' || ext === '.fit') {
+        const wcs = extractWCS(file.buffer, ext);
+        if (wcs) {
+          imageWidth = wcs.NAXIS1;
+          imageHeight = wcs.NAXIS2;
+        }
+      }
+    }
+
+    if (!imageWidth || !imageHeight) {
+      res.status(400).json({ error: 'Impossible de déterminer les dimensions de l\'image' });
+      return;
+    }
+
+    const jobId = await submitJob(file.buffer, file.originalname, imageWidth, imageHeight);
+    res.json({ jobId });
+  } catch (err: any) {
+    console.error('Plate solve submit error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/solve-plate/:id', (req, res) => {
+  const job = getJobStatus(req.params.id);
+  if (!job) {
+    res.status(404).json({ error: 'Job introuvable' });
+    return;
+  }
+
+  res.json({
+    jobId: job.localId,
+    status: job.status,
+    correspondences: job.correspondences,
+    error: job.error,
+  });
 });
 
 // SPA fallback in production
