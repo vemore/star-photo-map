@@ -44,8 +44,8 @@ function starRadius(mag: number): number {
 }
 
 function computeMaxMag(scale: number): number {
-  const raw = 5 + Math.log2(scale / 200);
-  return Math.max(5, Math.min(8.5, raw));
+  const raw = 6 + Math.log2(scale / 200);
+  return Math.max(6, Math.min(8.5, raw));
 }
 
 export type StarHoverCallback = (star: Star | null, x: number, y: number) => void;
@@ -129,7 +129,6 @@ export class SkyMap {
 
     for (const star of stars) {
       if (star.mag > maxMag) continue;
-      if (star.dec < -30) continue;
       const sp = project(star.ra, star.dec);
       const dx = sp.x - projPt.x;
       const dy = sp.y - projPt.y;
@@ -358,7 +357,6 @@ export class SkyMap {
 
     for (const star of stars) {
       if (star.mag > maxMag) continue;
-      if (star.dec < -30) continue;
 
       const p = project(star.ra, star.dec);
       const c = toCanvas(p.x, p.y, view);
@@ -399,7 +397,6 @@ export class SkyMap {
 
     for (const star of stars) {
       if (star.mag > 3 || !star.name) continue;
-      if (star.dec < -30) continue;
 
       const p = project(star.ra, star.dec);
       const c = toCanvas(p.x, p.y, view);

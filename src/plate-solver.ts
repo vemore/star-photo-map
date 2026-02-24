@@ -15,11 +15,11 @@ let triangleIndex: Map<number, IndexTriangle[]> | null = null;
 let indexStars: Star[] | null = null;
 
 /**
- * Build the triangle hash index from catalog stars with mag < 5.0.
+ * Build the triangle hash index from catalog stars with mag < 5.5.
  */
 function buildIndex(): void {
   const allStars = getStars();
-  indexStars = allStars.filter(s => s.mag < 5.0);
+  indexStars = allStars.filter(s => s.mag < 5.5);
 
   // Precompute unit vectors on the celestial sphere
   const vectors = indexStars.map(s => {
@@ -34,7 +34,7 @@ function buildIndex(): void {
   });
 
   triangleIndex = new Map();
-  const maxAngDist = 20 * DEG2RAD; // 20 degrees max separation
+  const maxAngDist = 15 * DEG2RAD; // 15 degrees max separation
 
   for (let i = 0; i < vectors.length; i++) {
     for (let j = i + 1; j < vectors.length; j++) {
@@ -263,7 +263,7 @@ function verifyMatch(
   const f = inv[2][0] * c0.y + inv[2][1] * c1.y + inv[2][2] * c2.y;
 
   // Now verify: transform all spots and find matching catalog stars
-  const allCatalogStars = getStars().filter(s => s.mag < 6.0);
+  const allCatalogStars = getStars().filter(s => s.mag < 8.0);
   const tolerance = 0.5 * DEG2RAD; // 0.5° tolerance
 
   // Precompute projection coords for catalog stars
