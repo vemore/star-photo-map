@@ -1,0 +1,11 @@
+node_modules/
+dist/
+uploads/
+data.db
+*.db-journal
+*.db-wal
+.git/
+.gitignore
+.dockerignore
+README.md
+data/

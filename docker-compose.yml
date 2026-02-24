@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3001:3001"
+    volumes:
+      - uploads:/app/uploads
+      - dbdata:/data
+    environment:
+      - PORT=3001
+      - DB_PATH=/data/data.db
+    restart: unless-stopped
+
+volumes:
+  uploads:
+  dbdata:

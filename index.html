@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Carte du Ciel Étoilé</title>
+  </head>
+  <body>
+    <div id="app">
+      <div id="map-container">
+        <canvas id="sky-canvas"></canvas>
+        <div id="photo-layer"></div>
+      </div>
+
+      <div id="side-panel">
+        <h2>Photos</h2>
+        <button id="add-photo-btn" class="btn-primary">+ Ajouter une photo</button>
+        <div id="photo-list"></div>
+      </div>
+      <button id="toggle-panel" title="Afficher/Masquer le panneau">▶</button>
+
+      <div id="tooltip"></div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

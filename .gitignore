@@ -1,0 +1,8 @@
+node_modules/
+dist/
+uploads/
+data.db
+*.db-journal
+*.db-wal
+*.log
+.vite/
