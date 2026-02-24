@@ -344,6 +344,38 @@ html, body {
   position: relative;
 }
 
+.search-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.search-row .star-search-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-pick-map {
+  padding: 5px 8px;
+  background: rgba(80, 60, 160, 0.5);
+  border: 1px solid rgba(100, 80, 200, 0.5);
+  color: #ccf;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.btn-pick-map:hover {
+  background: rgba(100, 80, 200, 0.7);
+}
+
+.btn-pick-map:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
 .star-search-input {
   width: 100%;
   padding: 6px 10px;

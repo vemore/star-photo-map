@@ -4,6 +4,7 @@ import { computeAffineTransform, affineToCSS } from './affine';
 import { getStarByHip } from './star-catalog';
 import { searchStars } from './search';
 import { uploadPhoto, deletePhotoAPI } from './api';
+import type { SkyMap } from './sky-map';
 
 const MARKER_COLORS = ['#ff4444', '#44cc44', '#4488ff'];
 
@@ -13,15 +14,33 @@ interface PlacedPhoto {
   visible: boolean;
 }
 
+function starDisplayLabel(star: Star): string {
+  if (star.name) {
+    if (star.bayer && star.constellation) {
+      return `${star.name} (${star.bayer} ${star.constellation})`;
+    }
+    return star.name;
+  }
+  if (star.desig && star.constellation) {
+    return `${star.desig} ${star.constellation}`;
+  }
+  if (star.flam && star.constellation) {
+    return `${star.flam} ${star.constellation}`;
+  }
+  return `HIP ${star.hip} (${star.constellation || '?'}, mag ${star.mag.toFixed(1)})`;
+}
+
 export class PhotoOverlay {
   private container: HTMLDivElement;
   private placedPhotos: PlacedPhoto[] = [];
   private getView: () => ViewState;
+  private skyMap: SkyMap | null;
   private onPhotosChanged: (() => void) | null = null;
 
-  constructor(container: HTMLDivElement, getView: () => ViewState) {
+  constructor(container: HTMLDivElement, getView: () => ViewState, skyMap?: SkyMap) {
     this.container = container;
     this.getView = getView;
+    this.skyMap = skyMap || null;
   }
 
   setOnPhotosChanged(cb: () => void) {
@@ -187,6 +206,7 @@ export class PhotoOverlay {
     const searchInputs: HTMLInputElement[] = [];
     const dropdowns: HTMLDivElement[] = [];
     const statusLabels: HTMLSpanElement[] = [];
+    const pickBtns: HTMLButtonElement[] = [];
 
     for (let i = 0; i < 3; i++) {
       const entry = document.createElement('div');
@@ -210,17 +230,55 @@ export class PhotoOverlay {
       searchWrapper.className = 'search-wrapper';
       searchWrapper.style.display = 'none';
 
+      const searchRow = document.createElement('div');
+      searchRow.className = 'search-row';
+
       const searchInput = document.createElement('input');
       searchInput.type = 'text';
       searchInput.placeholder = 'Rechercher une étoile...';
       searchInput.className = 'star-search-input';
       searchInputs.push(searchInput);
 
+      searchRow.appendChild(searchInput);
+
+      // "Carte" pick button (only if skyMap available)
+      if (this.skyMap) {
+        const pickBtn = document.createElement('button');
+        pickBtn.type = 'button';
+        pickBtn.className = 'btn-pick-map';
+        pickBtn.title = 'Choisir sur la carte';
+        pickBtn.textContent = 'Carte';
+        pickBtns.push(pickBtn);
+        searchRow.appendChild(pickBtn);
+
+        const skyMapRef = this.skyMap;
+        pickBtn.addEventListener('click', () => {
+          // Hide modal backdrop to reveal the map
+          backdrop.style.display = 'none';
+
+          skyMapRef.enterPickingMode((star: Star) => {
+            skyMapRef.exitPickingMode();
+            backdrop.style.display = '';
+            selectStar(i, star, starDisplayLabel(star));
+          });
+
+          // Escape handler to cancel and re-show modal
+          const escHandler = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+              skyMapRef.exitPickingMode();
+              backdrop.style.display = '';
+              window.removeEventListener('keydown', escHandler);
+            }
+          };
+          window.addEventListener('keydown', escHandler);
+        });
+      }
+
       const dropdown = document.createElement('div');
       dropdown.className = 'search-dropdown';
       dropdowns.push(dropdown);
 
-      searchWrapper.appendChild(searchInput);
+      searchWrapper.appendChild(searchRow);
       searchWrapper.appendChild(dropdown);
 
       info.appendChild(status);
@@ -356,6 +414,11 @@ export class PhotoOverlay {
       searchInputs[idx].value = label;
       searchInputs[idx].disabled = true;
       pointEntries[idx].classList.add('complete');
+
+      // Disable pick button if exists
+      if (pickBtns[idx]) {
+        pickBtns[idx].disabled = true;
+      }
 
       updateActiveIndex();
       checkComplete();

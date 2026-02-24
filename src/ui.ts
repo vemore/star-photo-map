@@ -78,6 +78,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
       if (star.bayer && star.constellation) {
         lines.push(`${star.bayer} ${star.constellation}`);
       }
+      lines.push(`HIP ${star.hip}`);
       lines.push(`Magnitude : ${star.mag.toFixed(2)}`);
       if (star.constellation) {
         lines.push(`Constellation : ${star.constellation}`);

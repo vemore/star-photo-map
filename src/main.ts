@@ -15,7 +15,7 @@ async function init() {
 
   // Init photo overlay
   const overlayDiv = document.getElementById('photo-layer') as HTMLDivElement;
-  const overlay = new PhotoOverlay(overlayDiv, () => skyMap.getView());
+  const overlay = new PhotoOverlay(overlayDiv, () => skyMap.getView(), skyMap);
 
   // Update photo transforms when map view changes
   skyMap.setOnViewChange(() => overlay.updateTransforms());

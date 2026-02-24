@@ -13,7 +13,7 @@ function normalizeRA(ra: number): number {
 
 export async function loadCatalog(): Promise<void> {
   const [starsData, linesData, namesData, constData] = await Promise.all([
-    fetch('/data/stars.6.json').then(r => r.json()),
+    fetch('/data/stars.8.json').then(r => r.json()),
     fetch('/data/constellations.lines.json').then(r => r.json()),
     fetch('/data/starnames.json').then(r => r.json()),
     fetch('/data/constellations.json').then(r => r.json()),
@@ -32,6 +32,7 @@ export async function loadCatalog(): Promise<void> {
       bv: parseFloat(f.properties.bv) || 0,
       name: info?.name || undefined,
       bayer: info?.bayer || undefined,
+      flam: info?.flam || undefined,
       constellation: info?.c || undefined,
       desig: info?.desig || undefined,
     };

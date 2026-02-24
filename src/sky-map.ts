@@ -43,7 +43,13 @@ function starRadius(mag: number): number {
   return Math.max(0.5, 4 - mag * 0.6);
 }
 
+function computeMaxMag(scale: number): number {
+  const raw = 5 + Math.log2(scale / 200);
+  return Math.max(5, Math.min(8.5, raw));
+}
+
 export type StarHoverCallback = (star: Star | null, x: number, y: number) => void;
+export type StarPickedCallback = (star: Star) => void;
 
 export class SkyMap {
   private canvas: HTMLCanvasElement;
@@ -58,6 +64,10 @@ export class SkyMap {
   private panStartY = 0;
   private panStartCenterX = 0;
   private panStartCenterY = 0;
+
+  // Picking mode
+  private pickingMode = false;
+  private onStarPicked: StarPickedCallback | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -79,6 +89,18 @@ export class SkyMap {
     return { ...this.view };
   }
 
+  enterPickingMode(callback: StarPickedCallback) {
+    this.pickingMode = true;
+    this.onStarPicked = callback;
+    this.canvas.style.cursor = 'crosshair';
+  }
+
+  exitPickingMode() {
+    this.pickingMode = false;
+    this.onStarPicked = null;
+    this.canvas.style.cursor = 'default';
+  }
+
   resize() {
     const dpr = window.devicePixelRatio || 1;
     const rect = this.canvas.getBoundingClientRect();
@@ -95,6 +117,30 @@ export class SkyMap {
 
     this.render();
     this.onViewChange?.();
+  }
+
+  private findClosestStar(mx: number, my: number): Star | null {
+    const projPt = fromCanvas(mx, my, this.view);
+    const stars = getStars();
+    const maxMag = computeMaxMag(this.view.scale);
+    let closest: Star | null = null;
+    let minDist = Infinity;
+    const threshold = 8 / this.view.scale;
+
+    for (const star of stars) {
+      if (star.mag > maxMag) continue;
+      if (star.dec < -30) continue;
+      const sp = project(star.ra, star.dec);
+      const dx = sp.x - projPt.x;
+      const dy = sp.y - projPt.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < threshold && dist < minDist) {
+        minDist = dist;
+        closest = star;
+      }
+    }
+
+    return closest;
   }
 
   private setupEvents() {
@@ -127,7 +173,9 @@ export class SkyMap {
         this.panStartY = e.clientY;
         this.panStartCenterX = this.view.centerX;
         this.panStartCenterY = this.view.centerY;
-        this.canvas.style.cursor = 'grabbing';
+        if (!this.pickingMode) {
+          this.canvas.style.cursor = 'grabbing';
+        }
       }
     });
 
@@ -151,10 +199,32 @@ export class SkyMap {
       }
     });
 
-    window.addEventListener('mouseup', () => {
+    window.addEventListener('mouseup', (e) => {
       if (this.isPanning) {
+        const dx = e.clientX - this.panStartX;
+        const dy = e.clientY - this.panStartY;
+        const moved = Math.abs(dx) + Math.abs(dy) > 3;
+
         this.isPanning = false;
-        this.canvas.style.cursor = 'default';
+        this.canvas.style.cursor = this.pickingMode ? 'crosshair' : 'default';
+
+        // Picking mode: click (not drag) selects star
+        if (this.pickingMode && !moved && this.onStarPicked) {
+          const rect = this.canvas.getBoundingClientRect();
+          const mx = e.clientX - rect.left;
+          const my = e.clientY - rect.top;
+          const star = this.findClosestStar(mx, my);
+          if (star) {
+            this.onStarPicked(star);
+          }
+        }
+      }
+    });
+
+    // Escape exits picking mode
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && this.pickingMode) {
+        this.exitPickingMode();
       }
     });
   }
@@ -162,24 +232,7 @@ export class SkyMap {
   private handleHover(mx: number, my: number, clientX: number, clientY: number) {
     if (!this.onStarHover) return;
 
-    const projPt = fromCanvas(mx, my, this.view);
-    const stars = getStars();
-    let closest: Star | null = null;
-    let minDist = Infinity;
-    const threshold = 8 / this.view.scale; // 8px in projection coords
-
-    for (const star of stars) {
-      if (star.mag > 5) continue;
-      const sp = project(star.ra, star.dec);
-      const dx = sp.x - projPt.x;
-      const dy = sp.y - projPt.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < threshold && dist < minDist) {
-        minDist = dist;
-        closest = star;
-      }
-    }
-
+    const closest = this.findClosestStar(mx, my);
     this.onStarHover(closest, clientX, clientY);
   }
 
@@ -301,9 +354,10 @@ export class SkyMap {
   private renderStars() {
     const { ctx, view } = this;
     const stars = getStars();
+    const maxMag = computeMaxMag(view.scale);
 
     for (const star of stars) {
-      // Skip very faint stars or those far from visible area
+      if (star.mag > maxMag) continue;
       if (star.dec < -30) continue;
 
       const p = project(star.ra, star.dec);

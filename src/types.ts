@@ -6,6 +6,7 @@ export interface Star {
   bv: number;
   name?: string;
   bayer?: string;
+  flam?: string;
   constellation?: string;
   desig?: string;
 }
