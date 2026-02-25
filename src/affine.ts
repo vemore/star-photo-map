@@ -55,3 +55,62 @@ export function computeAffineTransform(
 export function affineToCSS(m: AffineMatrix): string {
   return `matrix(${m.a}, ${m.b}, ${m.c}, ${m.d}, ${m.e}, ${m.f})`;
 }
+
+/**
+ * Least-squares affine fit for N ≥ 3 point pairs.
+ * Falls back to the exact 3-point solver when N === 3.
+ * Minimises sum of squared residuals over all N pairs.
+ */
+export function computeAffineLSQ(
+  photoPoints: Point[],
+  canvasPoints: Point[],
+): AffineMatrix {
+  const n = photoPoints.length;
+  if (n < 3) throw new Error('Au moins 3 points requis');
+  if (n === 3) {
+    return computeAffineTransform(
+      photoPoints as [Point, Point, Point],
+      canvasPoints as [Point, Point, Point],
+    );
+  }
+
+  // Normal equations for CSS affine: newX = a·px + c·py + e, newY = b·px + d·py + f
+  // Build A^T·A (3×3) and solve two right-hand sides (for X and for Y).
+  let s_xx = 0, s_xy = 0, s_x = 0;
+  let s_yy = 0, s_y = 0;
+  let s_xX = 0, s_yX = 0, s_X = 0;
+  let s_xY = 0, s_yY = 0, s_Y = 0;
+
+  for (let i = 0; i < n; i++) {
+    const x = photoPoints[i].x, y = photoPoints[i].y;
+    const X = canvasPoints[i].x, Y = canvasPoints[i].y;
+    s_xx += x * x; s_xy += x * y; s_x += x;
+    s_yy += y * y; s_y += y;
+    s_xX += x * X; s_yX += y * X; s_X += X;
+    s_xY += x * Y; s_yY += y * Y; s_Y += Y;
+  }
+
+  // M = [[s_xx, s_xy, s_x], [s_xy, s_yy, s_y], [s_x, s_y, n]]
+  const m00 = s_xx, m01 = s_xy, m02 = s_x;
+  const m10 = s_xy, m11 = s_yy, m12 = s_y;
+  const m20 = s_x,  m21 = s_y,  m22 = n;
+
+  const det =
+    m00 * (m11 * m22 - m12 * m21) -
+    m01 * (m10 * m22 - m12 * m20) +
+    m02 * (m10 * m21 - m11 * m20);
+
+  if (Math.abs(det) < 1e-6) throw new Error('Points colinéaires');
+
+  // Solve M·x = rhs via Cramer's rule
+  function cramer(r0: number, r1: number, r2: number): [number, number, number] {
+    const d0 = r0 * (m11 * m22 - m12 * m21) - m01 * (r1 * m22 - m12 * r2) + m02 * (r1 * m21 - m11 * r2);
+    const d1 = m00 * (r1 * m22 - m12 * r2) - r0 * (m10 * m22 - m12 * m20) + m02 * (m10 * r2 - r1 * m20);
+    const d2 = m00 * (m11 * r2 - r1 * m21) - m01 * (m10 * r2 - r1 * m20) + r0 * (m10 * m21 - m11 * m20);
+    return [d0 / det, d1 / det, d2 / det];
+  }
+
+  const [a, c, e] = cramer(s_xX, s_yX, s_X);
+  const [b, d, f] = cramer(s_xY, s_yY, s_Y);
+  return { a, b, c, d, e, f };
+}

@@ -319,7 +319,7 @@ export function wcsToCorrespondences(
     }
   }
 
-  return bestTriple.map((idx, pointIndex) => {
+  const result: Correspondence[] = bestTriple.map((idx, pointIndex) => {
     const { star, px, py } = candidates[idx];
     return {
       pointIndex,
@@ -329,6 +329,24 @@ export function wcsToCorrespondences(
       starName: starDisplayLabel(star),
     };
   });
+
+  // Add extra well-spread stars for a least-squares fit in the frontend
+  const usedSet = new Set(bestTriple);
+  const margin = Math.min(50, imageWidth * 0.02, imageHeight * 0.02);
+  for (let i = 0; i < candidates.length && result.length < 9; i++) {
+    if (usedSet.has(i)) continue;
+    const { px, py, star } = candidates[i];
+    if (px < margin || px > imageWidth - margin || py < margin || py > imageHeight - margin) continue;
+    result.push({
+      pointIndex: result.length,
+      photoX: px,
+      photoY: py,
+      starHip: star.hip,
+      starName: starDisplayLabel(star),
+    });
+  }
+
+  return result;
 }
 
 export function extractWCS(buffer: Buffer, ext: string): WCSData | null {

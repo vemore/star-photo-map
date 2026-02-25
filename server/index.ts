@@ -8,6 +8,7 @@ import { fileURLToPath } from 'url';
 import { createPhoto, getAllPhotos, deletePhoto, getPhotoFilename } from './db.js';
 import { extractWCS, wcsToCorrespondences, loadServerCatalog } from './wcs-reader.js';
 import { submitJob, getJobStatus, isConfigured as isAstrometryConfigured } from './astrometry.js';
+import { isASTAPInstalled, solveWithASTAP } from './astap.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
@@ -45,8 +46,8 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
     }
 
     const correspondences = JSON.parse(corrJson);
-    if (!Array.isArray(correspondences) || correspondences.length !== 3) {
-      res.status(400).json({ error: '3 correspondances requises' });
+    if (!Array.isArray(correspondences) || correspondences.length < 3) {
+      res.status(400).json({ error: 'Au moins 3 correspondances requises' });
       return;
     }
 
@@ -193,6 +194,28 @@ app.post('/api/solve-wcs', upload.single('photo'), async (req, res) => {
     res.json({ success: true, correspondences });
   } catch (err: any) {
     console.error('WCS solve error:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// --- ASTAP local plate solve route ---
+app.post('/api/solve-astap', upload.single('photo'), async (req, res) => {
+  if (!req.file) {
+    res.status(400).json({ error: 'Fichier manquant' });
+    return;
+  }
+  if (!isASTAPInstalled()) {
+    res.status(400).json({ error: 'ASTAP non installé (définir ASTAP_PATH)' });
+    return;
+  }
+
+  try {
+    const ext = path.extname(req.file.originalname).toLowerCase() || '.jpg';
+    const meta = await sharp(req.file.buffer).metadata();
+    const result = await solveWithASTAP(req.file.buffer, ext, meta.width ?? 0, meta.height ?? 0);
+    res.json(result);
+  } catch (err: any) {
+    console.error('ASTAP solve error:', err);
     res.status(500).json({ success: false, error: err.message });
   }
 });

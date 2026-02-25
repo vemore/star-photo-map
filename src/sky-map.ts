@@ -1,6 +1,7 @@
-import type { Star, ViewState, Point } from './types';
+import type { Star, DSO, ViewState, Point } from './types';
 import { project, toCanvas, fromCanvas, unproject } from './projection';
 import { getStars, getConstellationLines, getConstellationInfos } from './star-catalog';
+import { getDSOs } from './dso-catalog';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -48,7 +49,25 @@ function computeMaxMag(scale: number): number {
   return Math.max(6, Math.min(8.5, raw));
 }
 
+// ─── DSO rendering helpers ──────────────────────────────────────────────────
+
+/** Convert angular size (arcmin) to canvas pixels accounting for stereographic scale */
+function angularSizeToCanvasPx(arcmin: number, decDeg: number, scale: number): number {
+  const theta = (90 - decDeg) * Math.PI / 180;
+  const cos2 = Math.cos(theta / 2) ** 2;
+  const rad = (arcmin / 60) * Math.PI / 180;
+  return (rad / (2 * cos2)) * scale;
+}
+
+/** Position angle (E of celestial north) → angle on canvas */
+function dsoCanvasAngle(pa: number, raDeg: number): number {
+  const raRad = raDeg * Math.PI / 180;
+  const northAngle = Math.atan2(Math.cos(raRad), Math.sin(raRad));
+  return northAngle - pa * Math.PI / 180;
+}
+
 export type StarHoverCallback = (star: Star | null, x: number, y: number) => void;
+export type DSOHoverCallback = (dso: DSO | null, x: number, y: number) => void;
 export type StarPickedCallback = (star: Star) => void;
 
 export class SkyMap {
@@ -57,6 +76,8 @@ export class SkyMap {
   private view: ViewState;
   private onViewChange: (() => void) | null = null;
   private onStarHover: StarHoverCallback | null = null;
+  private onDSOHover: DSOHoverCallback | null = null;
+  private showDSOs = true;
 
   // Pan state
   private isPanning = false;
@@ -83,6 +104,24 @@ export class SkyMap {
 
   setOnStarHover(cb: StarHoverCallback) {
     this.onStarHover = cb;
+  }
+
+  setOnDSOHover(cb: DSOHoverCallback) {
+    this.onDSOHover = cb;
+  }
+
+  setShowDSOs(show: boolean) {
+    this.showDSOs = show;
+    this.render();
+  }
+
+  navigateTo(ra: number, dec: number, targetScale = 600) {
+    const p = project(ra, dec);
+    this.view.centerX = p.x;
+    this.view.centerY = p.y;
+    this.view.scale = targetScale;
+    this.render();
+    this.onViewChange?.();
   }
 
   getView(): ViewState {
@@ -228,11 +267,43 @@ export class SkyMap {
     });
   }
 
-  private handleHover(mx: number, my: number, clientX: number, clientY: number) {
-    if (!this.onStarHover) return;
+  private findClosestDSO(mx: number, my: number): DSO | null {
+    if (!this.showDSOs) return null;
+    const projPt = fromCanvas(mx, my, this.view);
+    const dsos = getDSOs();
+    const maxMag = computeMaxMag(this.view.scale) + 4;
+    let closest: DSO | null = null;
+    let minDist = Infinity;
+    const threshold = 20 / this.view.scale;
 
-    const closest = this.findClosestStar(mx, my);
-    this.onStarHover(closest, clientX, clientY);
+    for (const dso of dsos) {
+      if (dso.mag !== null && dso.mag > maxMag) continue;
+      const sp = project(dso.ra, dso.dec);
+      const dx = sp.x - projPt.x;
+      const dy = sp.y - projPt.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist < threshold && dist < minDist) {
+        minDist = dist;
+        closest = dso;
+      }
+    }
+
+    return closest;
+  }
+
+  private handleHover(mx: number, my: number, clientX: number, clientY: number) {
+    const closestStar = this.findClosestStar(mx, my);
+
+    if (this.onStarHover) {
+      this.onStarHover(closestStar, clientX, clientY);
+    }
+
+    if (this.onDSOHover && !closestStar) {
+      const closestDSO = this.findClosestDSO(mx, my);
+      this.onDSOHover(closestDSO, clientX, clientY);
+    } else if (this.onDSOHover && closestStar) {
+      this.onDSOHover(null, clientX, clientY);
+    }
   }
 
   render() {
@@ -245,8 +316,14 @@ export class SkyMap {
     this.renderBackground();
     this.renderGrid();
     this.renderConstellationLines();
+    if (this.showDSOs) {
+      this.renderDSOs();
+    }
     this.renderStars();
     this.renderStarLabels();
+    if (this.showDSOs) {
+      this.renderDSOLabels();
+    }
     this.renderConstellationNames();
 
     ctx.restore();
@@ -407,6 +484,238 @@ export class SkyMap {
 
       const r = starRadius(star.mag);
       ctx.fillText(star.name, c.x + r + 3, c.y);
+    }
+
+    ctx.textBaseline = 'alphabetic';
+  }
+
+  private renderDSOs() {
+    const { ctx, view } = this;
+    const dsos = getDSOs();
+    // Magnitude cutoff: slightly more generous than stars
+    const maxMag = 6 + Math.log2(view.scale / 200) * 1.5;
+
+    for (const dso of dsos) {
+      if (dso.mag !== null && dso.mag > maxMag) continue;
+
+      const p = project(dso.ra, dso.dec);
+      const c = toCanvas(p.x, p.y, view);
+
+      const majorArcmin = dso.majAxis ?? 1;
+      const minorArcmin = dso.minAxis ?? majorArcmin;
+      const rx = Math.max(2, angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale));
+      const ry = Math.max(2, angularSizeToCanvasPx(minorArcmin / 2, dso.dec, view.scale));
+      const angle = dsoCanvasAngle(dso.pa, dso.ra);
+
+      // Skip if completely off-screen
+      const margin = rx + 20;
+      if (c.x < -margin || c.x > view.width + margin || c.y < -margin || c.y > view.height + margin) {
+        continue;
+      }
+
+      // Opacity based on magnitude
+      const mag = dso.mag ?? 10;
+      const opacity = Math.min(1, Math.max(0.3, 1 - (mag - 4) * 0.07));
+
+      ctx.save();
+      ctx.globalAlpha = opacity;
+      ctx.translate(c.x, c.y);
+      ctx.rotate(angle);
+
+      switch (dso.type) {
+        case 'Gx': {
+          // Galaxy: filled ellipse with golden gradient
+          const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+          grad.addColorStop(0, 'rgba(220, 180, 100, 0.8)');
+          grad.addColorStop(0.5, 'rgba(180, 140, 70, 0.5)');
+          grad.addColorStop(1, 'rgba(150, 100, 40, 0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.scale(1, ry / rx);
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.scale(1, rx / ry);
+          ctx.strokeStyle = 'rgba(220, 180, 100, 0.6)';
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.scale(1, ry / rx);
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.stroke();
+          break;
+        }
+        case 'OC': {
+          // Open cluster: dashed circle, light blue
+          ctx.strokeStyle = 'rgba(140, 180, 255, 0.7)';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          break;
+        }
+        case 'GC': {
+          // Globular cluster: filled circle with gradient + cross
+          const gcR = rx;
+          const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, gcR);
+          grad.addColorStop(0, 'rgba(255, 220, 100, 0.7)');
+          grad.addColorStop(0.6, 'rgba(220, 160, 60, 0.4)');
+          grad.addColorStop(1, 'rgba(180, 120, 30, 0)');
+          ctx.fillStyle = grad;
+          ctx.beginPath();
+          ctx.arc(0, 0, gcR, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.strokeStyle = 'rgba(255, 200, 80, 0.6)';
+          ctx.lineWidth = 0.7;
+          ctx.beginPath();
+          ctx.arc(0, 0, gcR, 0, Math.PI * 2);
+          ctx.stroke();
+          // Cross
+          ctx.beginPath();
+          ctx.moveTo(-gcR, 0); ctx.lineTo(gcR, 0);
+          ctx.moveTo(0, -gcR); ctx.lineTo(0, gcR);
+          ctx.stroke();
+          break;
+        }
+        case 'EN': {
+          // Emission nebula: reddish ellipse gradient
+          const enGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+          enGrad.addColorStop(0, 'rgba(255, 80, 80, 0.4)');
+          enGrad.addColorStop(0.5, 'rgba(200, 50, 80, 0.2)');
+          enGrad.addColorStop(1, 'rgba(180, 30, 60, 0)');
+          ctx.fillStyle = enGrad;
+          ctx.beginPath();
+          ctx.scale(1, ry / rx);
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.scale(1, rx / ry);
+          ctx.strokeStyle = 'rgba(220, 80, 80, 0.4)';
+          ctx.lineWidth = 0.7;
+          ctx.beginPath();
+          ctx.scale(1, ry / rx);
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.stroke();
+          break;
+        }
+        case 'RN': {
+          // Reflection nebula: blue ellipse
+          const rnGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, rx);
+          rnGrad.addColorStop(0, 'rgba(80, 120, 255, 0.4)');
+          rnGrad.addColorStop(0.5, 'rgba(60, 100, 200, 0.2)');
+          rnGrad.addColorStop(1, 'rgba(40, 80, 180, 0)');
+          ctx.fillStyle = rnGrad;
+          ctx.beginPath();
+          ctx.scale(1, ry / rx);
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.scale(1, rx / ry);
+          ctx.strokeStyle = 'rgba(80, 140, 255, 0.4)';
+          ctx.lineWidth = 0.7;
+          ctx.beginPath();
+          ctx.scale(1, ry / rx);
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.stroke();
+          break;
+        }
+        case 'PN': {
+          // Planetary nebula: double circle, blue-cyan
+          ctx.strokeStyle = 'rgba(80, 200, 220, 0.8)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.strokeStyle = 'rgba(80, 200, 220, 0.5)';
+          ctx.beginPath();
+          ctx.arc(0, 0, rx * 0.4, 0, Math.PI * 2);
+          ctx.stroke();
+          break;
+        }
+        case 'SNR': {
+          // Supernova remnant: green-teal ellipse
+          const snrGrad = ctx.createRadialGradient(0, 0, rx * 0.6, 0, 0, rx);
+          snrGrad.addColorStop(0, 'rgba(80, 200, 150, 0)');
+          snrGrad.addColorStop(0.7, 'rgba(80, 200, 150, 0.2)');
+          snrGrad.addColorStop(1, 'rgba(60, 180, 120, 0.5)');
+          ctx.fillStyle = snrGrad;
+          ctx.beginPath();
+          ctx.scale(1, ry / rx);
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.scale(1, rx / ry);
+          ctx.strokeStyle = 'rgba(80, 200, 150, 0.5)';
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.scale(1, ry / rx);
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.stroke();
+          break;
+        }
+        case 'DN': {
+          // Dark nebula: simple dark outline
+          ctx.strokeStyle = 'rgba(120, 120, 140, 0.5)';
+          ctx.lineWidth = 0.7;
+          ctx.beginPath();
+          ctx.scale(1, ry / rx);
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.stroke();
+          break;
+        }
+        default: {
+          // Unknown: simple circle
+          ctx.strokeStyle = 'rgba(160, 160, 160, 0.4)';
+          ctx.lineWidth = 0.7;
+          ctx.beginPath();
+          ctx.arc(0, 0, rx, 0, Math.PI * 2);
+          ctx.stroke();
+          break;
+        }
+      }
+
+      ctx.restore();
+    }
+  }
+
+  private renderDSOLabels() {
+    const { ctx, view } = this;
+    const dsos = getDSOs();
+    const maxMag = 6 + Math.log2(view.scale / 200) * 1.5;
+
+    const TYPE_COLORS: Record<string, string> = {
+      'Gx':  'rgba(220, 180, 100, 0.8)',
+      'OC':  'rgba(140, 180, 255, 0.8)',
+      'GC':  'rgba(255, 200, 80, 0.8)',
+      'EN':  'rgba(220, 100, 100, 0.8)',
+      'RN':  'rgba(100, 150, 255, 0.8)',
+      'PN':  'rgba(80, 200, 220, 0.9)',
+      'SNR': 'rgba(80, 200, 150, 0.8)',
+      'DN':  'rgba(120, 120, 140, 0.6)',
+      '?':   'rgba(160, 160, 160, 0.6)',
+    };
+
+    ctx.textBaseline = 'middle';
+
+    for (const dso of dsos) {
+      if (dso.mag !== null && dso.mag > maxMag) continue;
+
+      const isMess = dso.id.startsWith('M') && !dso.id.startsWith('M0');
+      const majorArcmin = dso.majAxis ?? 1;
+      const rx = angularSizeToCanvasPx(majorArcmin / 2, dso.dec, view.scale);
+
+      // Label visibility rules
+      if (isMess && view.scale <= 100) continue;
+      if (!isMess && (view.scale <= 300 || rx <= 4)) continue;
+
+      const p = project(dso.ra, dso.dec);
+      const c = toCanvas(p.x, p.y, view);
+
+      if (c.x < -80 || c.x > view.width + 80 || c.y < -20 || c.y > view.height + 20) {
+        continue;
+      }
+
+      const label = isMess ? dso.id : dso.id.replace('NGC', 'NGC ').replace('IC', 'IC ');
+      ctx.font = '9px sans-serif';
+      ctx.fillStyle = TYPE_COLORS[dso.type] || 'rgba(160, 160, 160, 0.7)';
+      ctx.fillText(label, c.x + Math.max(2, rx) + 2, c.y);
     }
 
     ctx.textBaseline = 'alphabetic';

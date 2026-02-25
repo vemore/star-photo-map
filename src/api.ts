@@ -71,3 +71,14 @@ export async function pollPlateSolve(jobId: string): Promise<AstrometrySolveStat
   if (!res.ok) throw new Error('Impossible de récupérer le statut');
   return res.json();
 }
+
+export async function solveWithASTAP(file: File): Promise<PlateSolveResult> {
+  const fd = new FormData();
+  fd.append('photo', file);
+  const res = await fetch('/api/solve-astap', { method: 'POST', body: fd });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    return { success: false, error: data.error ?? 'Erreur' };
+  }
+  return res.json();
+}

@@ -1,5 +1,6 @@
-import type { Star } from './types';
+import type { Star, DSO, DSOSearchResult } from './types';
 import { getStars, getStarByHip } from './star-catalog';
+import { getDSOs } from './dso-catalog';
 
 export interface SearchResult {
   star: Star;
@@ -101,3 +102,73 @@ export function searchStars(query: string, limit = 10): SearchResult[] {
   results.sort((a, b) => b.score - a.score);
   return results.slice(0, limit);
 }
+
+const DSO_TYPE_NAMES: Record<string, string> = {
+  'Gx':  'Galaxie',
+  'OC':  'Amas ouvert',
+  'GC':  'Amas globulaire',
+  'EN':  'Nébuleuse en émission',
+  'RN':  'Nébuleuse par réflexion',
+  'PN':  'Nébuleuse planétaire',
+  'SNR': 'Rémanent de supernova',
+  'DN':  'Nébuleuse sombre',
+  '?':   'Objet céleste',
+};
+
+function dsoLabel(dso: DSO): string {
+  const typeName = DSO_TYPE_NAMES[dso.type] || 'Objet';
+  if (dso.nameFr) {
+    return `${dso.id} – ${dso.nameFr}`;
+  }
+  return `${dso.id} (${typeName})`;
+}
+
+export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
+  if (!query || query.length < 1) return [];
+
+  const q = query.toLowerCase().trim();
+  const results: DSOSearchResult[] = [];
+
+  for (const dso of getDSOs()) {
+    let score = 0;
+    const idLower = dso.id.toLowerCase();
+    const nameLower = dso.nameFr ? dso.nameFr.toLowerCase() : '';
+
+    // 1. Exact ID match
+    if (idLower === q) {
+      score = 100;
+    }
+    // 2. ID prefix match
+    else if (idLower.startsWith(q)) {
+      score = 90;
+    }
+    // 3. Exact nameFr match
+    else if (nameLower && nameLower === q) {
+      score = 80;
+    }
+    // 4. nameFr starts with query
+    else if (nameLower && nameLower.startsWith(q)) {
+      score = 65;
+    }
+    // 5. nameFr contains query
+    else if (nameLower && nameLower.includes(q)) {
+      score = 40;
+    }
+    // 6. Partial ID match (e.g. "ngc70" matches "NGC7000")
+    else if (idLower.includes(q)) {
+      score = 25;
+    }
+
+    if (score > 0) {
+      // Brightness boost
+      const mag = dso.mag ?? 14;
+      score += Math.max(0, (10 - mag) * 1.5);
+      results.push({ dso, label: dsoLabel(dso), score });
+    }
+  }
+
+  results.sort((a, b) => b.score - a.score);
+  return results.slice(0, limit);
+}
+
+export { DSO_TYPE_NAMES };

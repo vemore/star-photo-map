@@ -25,8 +25,10 @@ export function detectStars(
     gray[i] = 0.299 * r + 0.587 * g + 0.114 * b;
   }
 
-  // 2. Box blur (separable, radius 25) for background estimation
-  const radius = 25;
+  // 2. Box blur for background estimation.
+  // Radius must be large enough to capture extended emission nebulae as background.
+  // Use 7% of the shorter image dimension, clamped to [25, 100].
+  const radius = Math.max(25, Math.min(100, Math.round(Math.min(w, h) * 0.07)));
   const background = boxBlur(gray, w, h, radius);
 
   // 3. Subtract background
@@ -116,10 +118,16 @@ export function detectStars(
     }
   }
 
-  // 7. Build spots array, sort by brightness
+  // 7. Build spots array, sort by brightness.
+  // Reject components that are too large — these are nebulae, galaxy cores, or
+  // detector artefacts, not stellar point sources.
+  // Cap at 160px regardless of image dimensions: empirically this filters extended
+  // objects (nebulae, compact galaxy nuclei) while keeping bloomed bright stars.
+  const maxSpotSize = Math.min(160, Math.max(80, Math.round(w * h * 0.0004)));
   const spots: DetectedSpot[] = [];
   for (const comp of components.values()) {
-    if (comp.count < 2) continue; // skip single-pixel noise
+    if (comp.count < 2) continue;          // skip single-pixel noise
+    if (comp.count > maxSpotSize) continue; // skip extended objects (nebulae)
     spots.push({
       x: comp.sx / comp.sb,
       y: comp.sy / comp.sb,

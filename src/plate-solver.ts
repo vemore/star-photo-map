@@ -262,9 +262,17 @@ function verifyMatch(
   const d = inv[1][0] * c0.y + inv[1][1] * c1.y + inv[1][2] * c2.y;
   const f = inv[2][0] * c0.y + inv[2][1] * c1.y + inv[2][2] * c2.y;
 
+  // Sanity check: validate the implied plate scale (projection units per pixel).
+  // For astrophotos scaled to ~1000px wide, the stereographic projection scale
+  // near Dec 0° is ~0.01745 proj/°. Acceptable FOV range: 5 arcmin to 35°.
+  //   5 arcmin  → (5/60)° × 0.01745 / 1000px ≈ 1.5e-6 proj/px
+  //   35°        →   35°  × 0.01745 / 1000px ≈ 6.1e-4 proj/px
+  const plateScale = Math.sqrt(a * a + b * b);
+  if (plateScale < 1e-6 || plateScale > 8e-4) return null;
+
   // Now verify: transform all spots and find matching catalog stars
   const allCatalogStars = getStars().filter(s => s.mag < 8.0);
-  const tolerance = 0.5 * DEG2RAD; // 0.5° tolerance
+  const tolerance = 0.5 * DEG2RAD; // 0.5° tolerance for initial candidate search
 
   // Precompute projection coords for catalog stars
   const catProjected = allCatalogStars.map(s => ({

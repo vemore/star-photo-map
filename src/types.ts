@@ -90,3 +90,30 @@ export interface AstrometrySolveStatus {
   correspondences?: PhotoCorrespondence[];
   error?: string;
 }
+
+export type DSOType = 'Gx' | 'OC' | 'GC' | 'EN' | 'RN' | 'PN' | 'SNR' | 'DN' | '?';
+
+export interface DSO {
+  id: string;           // "M31", "NGC224", "IC1805", "SH2-106"
+  ra: number;           // degrés [0, 360)
+  dec: number;          // degrés [-90, 90]
+  type: DSOType;
+  majAxis: number | null;   // arcminutes
+  minAxis: number | null;   // arcminutes (null → même que majAxis)
+  pa: number;           // angle de position, degrés E du nord
+  mag: number | null;
+  nameFr: string | null;
+}
+
+export interface DSOSearchResult {
+  dso: DSO;
+  label: string;
+  score: number;
+}
+
+export interface ManualPlacement {
+  centerRa: number;
+  centerDec: number;
+  rotationDeg: number;
+  projPerPx: number;   // unités de projection par pixel photo
+}

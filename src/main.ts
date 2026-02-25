@@ -1,4 +1,5 @@
 import { loadCatalog } from './star-catalog';
+import { loadDSOCatalog } from './dso-catalog';
 import { SkyMap } from './sky-map';
 import { PhotoOverlay } from './photo-overlay';
 import { getPhotos } from './api';
@@ -6,8 +7,8 @@ import { setupUI } from './ui';
 import './style.css';
 
 async function init() {
-  // Load star catalog
-  await loadCatalog();
+  // Load star and DSO catalogs in parallel
+  await Promise.all([loadCatalog(), loadDSOCatalog()]);
 
   // Init sky map
   const canvas = document.getElementById('sky-canvas') as HTMLCanvasElement;

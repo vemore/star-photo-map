@@ -577,3 +577,204 @@ html, body {
   height: 1px;
   background: rgba(60, 60, 120, 0.3);
 }
+
+/* ─── Manual placement section in modal ─── */
+.manual-placement-section {
+  margin-top: 4px;
+}
+
+/* ─── DSO section in side panel ─── */
+.dso-section {
+  margin-top: 24px;
+  border-top: 1px solid rgba(60, 60, 120, 0.3);
+  padding-top: 16px;
+}
+
+.dso-section h2 {
+  font-size: 14px;
+  margin-bottom: 10px;
+  color: #aab;
+  font-weight: 500;
+}
+
+.dso-toggle-row {
+  margin-bottom: 10px;
+}
+
+.dso-toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #99a;
+  cursor: pointer;
+  user-select: none;
+}
+
+.dso-toggle-label input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: rgba(80, 100, 200, 0.8);
+}
+
+.dso-search-wrapper {
+  position: relative;
+  margin-bottom: 10px;
+}
+
+.dso-info-panel {
+  background: rgba(20, 20, 50, 0.5);
+  border: 1px solid rgba(60, 60, 140, 0.3);
+  border-radius: 6px;
+  padding: 10px;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.dso-info-name {
+  color: #ccf;
+  font-weight: 500;
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.dso-info-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+}
+
+.dso-info-table td {
+  padding: 2px 0;
+  vertical-align: top;
+}
+
+.dso-info-table td:first-child {
+  color: #88a;
+  width: 80px;
+  flex-shrink: 0;
+}
+
+.dso-info-table td:last-child {
+  color: #ccd;
+}
+
+.dso-nearby-panel {
+  background: rgba(20, 20, 50, 0.4);
+  border: 1px solid rgba(60, 60, 120, 0.2);
+  border-radius: 6px;
+  padding: 8px;
+  margin-bottom: 8px;
+}
+
+.dso-nearby-title {
+  font-size: 11px;
+  color: #88a;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 6px;
+}
+
+.dso-nearby-star {
+  font-size: 12px;
+  color: #aab;
+  padding: 4px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.dso-nearby-star:hover {
+  background: rgba(60, 60, 120, 0.3);
+  color: #ccf;
+}
+
+/* ─── Manual placement toolbar ─── */
+.manual-toolbar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(10, 10, 35, 0.96);
+  border: 1px solid rgba(80, 80, 200, 0.5);
+  border-radius: 10px;
+  padding: 14px 20px;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 360px;
+  box-shadow: 0 4px 24px rgba(0, 0, 80, 0.5);
+}
+
+.manual-toolbar-label {
+  font-size: 13px;
+  color: #aac;
+  font-weight: 500;
+  text-align: center;
+  letter-spacing: 0.3px;
+}
+
+.manual-toolbar-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #99a;
+}
+
+.manual-rotation-range,
+.manual-zoom-range {
+  flex: 1;
+  accent-color: rgba(100, 120, 220, 0.9);
+  cursor: pointer;
+}
+
+.manual-rotation-val {
+  color: #ccd;
+  min-width: 32px;
+  text-align: right;
+  font-size: 11px;
+}
+
+.manual-toolbar-buttons {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+.manual-validate-btn {
+  padding: 8px 24px;
+  background: rgba(40, 120, 60, 0.7);
+  border: 1px solid rgba(60, 150, 80, 0.5);
+  color: #cdc;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+
+.manual-validate-btn:hover:not(:disabled) {
+  background: rgba(50, 140, 70, 0.9);
+}
+
+.manual-validate-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.manual-cancel-btn {
+  padding: 8px 20px;
+  background: none;
+  border: 1px solid rgba(80, 80, 120, 0.4);
+  color: #889;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.2s;
+}
+
+.manual-cancel-btn:hover {
+  background: rgba(80, 40, 40, 0.3);
+  color: #e88;
+  border-color: rgba(180, 60, 60, 0.4);
+}

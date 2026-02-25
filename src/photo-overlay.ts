@@ -1,9 +1,9 @@
-import type { Photo, PhotoCorrespondence, Star, Point, ViewState } from './types';
-import { project, toCanvas } from './projection';
-import { computeAffineTransform, affineToCSS } from './affine';
-import { getStarByHip } from './star-catalog';
+import type { Photo, PhotoCorrespondence, Star, Point, ViewState, ManualPlacement } from './types';
+import { project, toCanvas, unproject } from './projection';
+import { computeAffineTransform, computeAffineLSQ, affineToCSS } from './affine';
+import { getStarByHip, getStars } from './star-catalog';
 import { searchStars } from './search';
-import { uploadPhoto, deletePhotoAPI, solveWCS, submitPlateSolve, pollPlateSolve } from './api';
+import { uploadPhoto, deletePhotoAPI, solveWCS, submitPlateSolve, pollPlateSolve, solveWithASTAP } from './api';
 import { detectStarsFromFile } from './star-detector';
 import { solvePlate } from './plate-solver';
 import type { SkyMap } from './sky-map';
@@ -120,16 +120,8 @@ export class PhotoOverlay {
     const { photo, imgEl } = placed;
     if (photo.correspondences.length < 3) return;
 
-    const photoPoints: [Point, Point, Point] = [
-      { x: 0, y: 0 },
-      { x: 0, y: 0 },
-      { x: 0, y: 0 },
-    ];
-    const canvasPoints: [Point, Point, Point] = [
-      { x: 0, y: 0 },
-      { x: 0, y: 0 },
-      { x: 0, y: 0 },
-    ];
+    const photoPoints: Point[] = [];
+    const canvasPoints: Point[] = [];
 
     for (const corr of photo.correspondences) {
       const star = getStarByHip(corr.starHip);
@@ -137,13 +129,16 @@ export class PhotoOverlay {
 
       const proj = project(star.ra, star.dec);
       const canvasPt = toCanvas(proj.x, proj.y, view);
-
-      photoPoints[corr.pointIndex] = { x: corr.photoX, y: corr.photoY };
-      canvasPoints[corr.pointIndex] = canvasPt;
+      photoPoints.push({ x: corr.photoX, y: corr.photoY });
+      canvasPoints.push(canvasPt);
     }
 
+    if (photoPoints.length < 3) return;
+
     try {
-      const matrix = computeAffineTransform(photoPoints, canvasPoints);
+      const matrix = photoPoints.length === 3
+        ? computeAffineTransform(photoPoints as [Point, Point, Point], canvasPoints as [Point, Point, Point])
+        : computeAffineLSQ(photoPoints, canvasPoints);
       imgEl.style.transform = affineToCSS(matrix);
     } catch {
       // Points colinear - hide
@@ -157,6 +152,8 @@ export class PhotoOverlay {
     let activeIndex = 0;
     let naturalWidth = 0;
     let naturalHeight = 0;
+    // Extra correspondences (pointIndex >= 3) from auto-solve, used for LSQ fit
+    let extraAutoCorrespondences: PhotoCorrespondence[] = [];
 
     // Create modal backdrop
     const backdrop = document.createElement('div');
@@ -241,6 +238,13 @@ export class PhotoOverlay {
     btnLocal.textContent = 'Résoudre localement';
     autoBtns.appendChild(btnLocal);
 
+    // ASTAP local solve button
+    const btnASTAP = document.createElement('button');
+    btnASTAP.type = 'button';
+    btnASTAP.className = 'btn-auto-solve';
+    btnASTAP.textContent = 'ASTAP (local)';
+    autoBtns.appendChild(btnASTAP);
+
     autoSection.appendChild(autoBtns);
 
     // Status area
@@ -249,6 +253,23 @@ export class PhotoOverlay {
     autoSection.appendChild(autoStatus);
 
     formSide.appendChild(autoSection);
+
+    // Manual placement button
+    const manualSection = document.createElement('div');
+    manualSection.className = 'manual-placement-section';
+
+    const manualBtn = document.createElement('button');
+    manualBtn.type = 'button';
+    manualBtn.className = 'btn-auto-solve full-width';
+    manualBtn.textContent = 'Placement manuel sur la carte';
+    manualBtn.title = 'Glisser-déposer la photo sur la carte';
+    manualSection.appendChild(manualBtn);
+    formSide.appendChild(manualSection);
+
+    manualBtn.addEventListener('click', () => {
+      backdrop.remove();
+      this.openManualPlacement(file);
+    });
 
     // Separator
     const separator = document.createElement('div');
@@ -270,12 +291,14 @@ export class PhotoOverlay {
       btnWCS.disabled = true;
       btnOnline.disabled = true;
       btnLocal.disabled = true;
+      btnASTAP.disabled = true;
     }
 
     function enableAutoButtons() {
       btnWCS.disabled = !isAstroFile;
       btnOnline.disabled = false;
       btnLocal.disabled = false;
+      btnASTAP.disabled = false;
     }
 
     // 3 point entries
@@ -527,6 +550,9 @@ export class PhotoOverlay {
     function applyAutoSolveResult(correspondences: PhotoCorrespondence[]) {
       if (!naturalWidth || !naturalHeight) return;
 
+      // Save extras (pointIndex >= 3) for LSQ fitting at upload time
+      extraAutoCorrespondences = correspondences.filter(c => c.pointIndex >= 3);
+
       const scaleX = photoImg.offsetWidth / naturalWidth;
       const scaleY = photoImg.offsetHeight / naturalHeight;
 
@@ -672,12 +698,36 @@ export class PhotoOverlay {
       }
     });
 
+    // --- ASTAP button handler ---
+    btnASTAP.addEventListener('click', async () => {
+      disableAutoButtons();
+      setAutoStatus('Résolution ASTAP en cours…', 'solving');
+
+      try {
+        const result = await solveWithASTAP(file);
+
+        if (result.success && result.correspondences && result.correspondences.length >= 3) {
+          setAutoStatus('Résolu par ASTAP !', 'success');
+          applyAutoSolveResult(result.correspondences);
+        } else {
+          setAutoStatus(result.error ?? 'Échec ASTAP', 'failed');
+          enableAutoButtons();
+        }
+      } catch (err: any) {
+        setAutoStatus(err.message, 'failed');
+        enableAutoButtons();
+      }
+    });
+
     submitBtn.addEventListener('click', async () => {
       submitBtn.disabled = true;
       submitBtn.textContent = 'Envoi en cours...';
 
       try {
-        const correspondences = points.filter(Boolean) as PhotoCorrespondence[];
+        const correspondences = [
+          ...(points.filter(Boolean) as PhotoCorrespondence[]),
+          ...extraAutoCorrespondences,
+        ];
         const photo = await uploadPhoto(file, correspondences);
         this.addPhotoToMap(photo);
         this.onPhotosChanged?.();
@@ -689,4 +739,289 @@ export class PhotoOverlay {
       }
     });
   }
+
+  /** Open manual placement mode: semi-transparent photo draggable on the map */
+  openManualPlacement(file: File) {
+    const view = this.getView();
+
+    // Create preview img element
+    const imgEl = document.createElement('img');
+    imgEl.className = 'photo-overlay-img manual-placement-img';
+    imgEl.style.opacity = '0.5';
+    imgEl.style.pointerEvents = 'auto';
+    imgEl.style.cursor = 'move';
+    const objUrl = URL.createObjectURL(file);
+    imgEl.src = objUrl;
+    this.container.style.pointerEvents = 'auto';
+    this.container.appendChild(imgEl);
+
+    let naturalWidth = 0;
+    let naturalHeight = 0;
+
+    imgEl.onload = () => {
+      naturalWidth = imgEl.naturalWidth;
+      naturalHeight = imgEl.naturalHeight;
+      redraw(this.getView());
+    };
+
+    // Placement state
+    const placement: ManualPlacement = {
+      centerRa: 0,
+      centerDec: 60,
+      rotationDeg: 0,
+      projPerPx: 0.002,
+    };
+
+    // Initialize to current map center
+    const initView = this.getView();
+    const centerProj = { x: initView.centerX, y: initView.centerY };
+    const centerSky = unproject(centerProj.x, centerProj.y);
+    placement.centerRa = centerSky.ra;
+    placement.centerDec = centerSky.dec;
+    placement.projPerPx = 1 / initView.scale * 0.5;
+
+    // Toolbar
+    const toolbar = document.createElement('div');
+    toolbar.className = 'manual-toolbar';
+    toolbar.innerHTML = `
+      <span class="manual-toolbar-label">Mode placement manuel</span>
+      <label class="manual-toolbar-item">
+        Rotation&nbsp;
+        <input type="range" min="-180" max="180" value="0" step="1" class="manual-rotation-range">
+        <span class="manual-rotation-val">0°</span>
+      </label>
+      <label class="manual-toolbar-item">
+        Zoom photo&nbsp;
+        <input type="range" min="-6" max="2" value="0" step="0.1" class="manual-zoom-range">
+      </label>
+      <div class="manual-toolbar-buttons">
+        <button class="manual-validate-btn">Valider</button>
+        <button class="manual-cancel-btn">Annuler</button>
+      </div>
+    `;
+    document.body.appendChild(toolbar);
+
+    const rotationRange = toolbar.querySelector('.manual-rotation-range') as HTMLInputElement;
+    const rotationVal = toolbar.querySelector('.manual-rotation-val') as HTMLSpanElement;
+    const zoomRange = toolbar.querySelector('.manual-zoom-range') as HTMLInputElement;
+    const validateBtn = toolbar.querySelector('.manual-validate-btn') as HTMLButtonElement;
+    const cancelBtn = toolbar.querySelector('.manual-cancel-btn') as HTMLButtonElement;
+
+    const redraw = (v: ViewState) => {
+      if (!naturalWidth || !naturalHeight) return;
+      applyManualTransform(imgEl, placement, v, naturalWidth, naturalHeight);
+    };
+
+    // Hook into view changes via SkyMap's public setOnViewChange
+    if (this.skyMap) {
+      const origOnViewChange = (this.skyMap as any)['onViewChange'] as (() => void) | null;
+      this.skyMap.setOnViewChange(() => {
+        origOnViewChange?.();
+        redraw(this.getView());
+      });
+    }
+
+    // Drag on the image
+    let isDragging = false;
+    let dragStartX = 0;
+    let dragStartY = 0;
+    let dragStartRa = placement.centerRa;
+    let dragStartDec = placement.centerDec;
+
+    imgEl.addEventListener('mousedown', (e) => {
+      e.stopPropagation();
+      isDragging = true;
+      dragStartX = e.clientX;
+      dragStartY = e.clientY;
+      dragStartRa = placement.centerRa;
+      dragStartDec = placement.centerDec;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      const v = this.getView();
+      const dx = (e.clientX - dragStartX) / v.scale;
+      const dy = (e.clientY - dragStartY) / v.scale;
+      // Current center in projection
+      const startProj = project(dragStartRa, dragStartDec);
+      const newProj = { x: startProj.x + dx, y: startProj.y - dy };
+      const newSky = unproject(newProj.x, newProj.y);
+      placement.centerRa = newSky.ra;
+      placement.centerDec = newSky.dec;
+      redraw(v);
+    });
+
+    window.addEventListener('mouseup', () => {
+      isDragging = false;
+    });
+
+    // Scroll on image → zoom
+    imgEl.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+      placement.projPerPx *= factor;
+      redraw(this.getView());
+    }, { passive: false });
+
+    // Rotation slider
+    rotationRange.addEventListener('input', () => {
+      placement.rotationDeg = parseFloat(rotationRange.value);
+      rotationVal.textContent = `${placement.rotationDeg}°`;
+      redraw(this.getView());
+    });
+
+    // Zoom slider (log scale)
+    zoomRange.addEventListener('input', () => {
+      const baseScale = 1 / this.getView().scale * 0.5;
+      placement.projPerPx = baseScale * Math.pow(2, parseFloat(zoomRange.value));
+      redraw(this.getView());
+    });
+
+    const cleanup = () => {
+      imgEl.remove();
+      toolbar.remove();
+      URL.revokeObjectURL(objUrl);
+      this.container.style.pointerEvents = 'none';
+    };
+
+    // Cancel
+    cancelBtn.addEventListener('click', cleanup);
+
+    // Validate
+    validateBtn.addEventListener('click', async () => {
+      if (!naturalWidth || !naturalHeight) return;
+      validateBtn.disabled = true;
+      validateBtn.textContent = 'Traitement…';
+
+      try {
+        const correspondences = buildSyntheticCorrespondences(placement, naturalWidth, naturalHeight);
+        if (!correspondences) {
+          alert('Impossible de trouver des étoiles de correspondance. Essayez de repositionner la photo.');
+          validateBtn.disabled = false;
+          validateBtn.textContent = 'Valider';
+          return;
+        }
+        const photo = await uploadPhoto(file, correspondences);
+        cleanup();
+        this.addPhotoToMap(photo);
+        this.onPhotosChanged?.();
+      } catch (err: any) {
+        alert(`Erreur : ${err.message}`);
+        validateBtn.disabled = false;
+        validateBtn.textContent = 'Valider';
+      }
+    });
+  }
+}
+
+/** Apply manual placement CSS transform to imgEl */
+function applyManualTransform(
+  imgEl: HTMLImageElement,
+  placement: ManualPlacement,
+  view: ViewState,
+  natW: number,
+  natH: number,
+): void {
+  // Center of photo in canvas coords
+  const centerProj = project(placement.centerRa, placement.centerDec);
+  const centerCanvas = toCanvas(centerProj.x, centerProj.y, view);
+
+  // Scale: projection units per pixel * view scale = canvas pixels per photo pixel
+  const pxPerPx = placement.projPerPx * view.scale;
+
+  // Rotation angle (convert PA to canvas angle)
+  const rotRad = placement.rotationDeg * Math.PI / 180;
+
+  // CSS matrix to map photo pixel (0,0) to canvas
+  // The photo pixel (cx, cy) maps to center
+  const cx = natW / 2;
+  const cy = natH / 2;
+
+  const cos = Math.cos(rotRad) * pxPerPx;
+  const sin = Math.sin(rotRad) * pxPerPx;
+
+  // matrix(a, b, c, d, e, f): maps (photoX, photoY) → canvas
+  const a = cos;
+  const b = sin;
+  const c = -sin;
+  const d = cos;
+  const e = centerCanvas.x - cos * cx + sin * cy;
+  const f = centerCanvas.y - sin * cx - cos * cy;
+
+  imgEl.style.transform = `matrix(${a}, ${b}, ${c}, ${d}, ${e}, ${f})`;
+}
+
+/** Build 3 synthetic PhotoCorrespondence from manual placement by finding nearest stars to photo corners */
+function buildSyntheticCorrespondences(
+  placement: ManualPlacement,
+  natW: number,
+  natH: number,
+): PhotoCorrespondence[] | null {
+  // Three representative photo points (corners/center arrangement)
+  const photoPoints: [number, number][] = [
+    [natW * 0.2, natH * 0.2],
+    [natW * 0.8, natH * 0.2],
+    [natW * 0.5, natH * 0.8],
+  ];
+
+  const centerProj = project(placement.centerRa, placement.centerDec);
+  const pxPerPx = placement.projPerPx;
+  const rotRad = placement.rotationDeg * Math.PI / 180;
+  const cos = Math.cos(rotRad);
+  const sin = Math.sin(rotRad);
+  const cx = natW / 2;
+  const cy = natH / 2;
+
+  const allStars = getStars().filter(s => s.mag <= 9);
+
+  const correspondences: PhotoCorrespondence[] = [];
+
+  for (let idx = 0; idx < 3; idx++) {
+    const [px, py] = photoPoints[idx];
+    // Map photo pixel → projection coords
+    const dpx = px - cx;
+    const dpy = py - cy;
+    const projX = centerProj.x + (cos * dpx - sin * dpy) * pxPerPx;
+    const projY = centerProj.y + (sin * dpx + cos * dpy) * pxPerPx;
+    const sky = unproject(projX, projY);
+
+    // Find nearest star
+    let nearest: typeof allStars[0] | null = null;
+    let minDist = Infinity;
+    const toRad = Math.PI / 180;
+    for (const star of allStars) {
+      const d1 = sky.dec * toRad;
+      const d2 = star.dec * toRad;
+      const dra = (star.ra - sky.ra) * toRad;
+      const cos2 = Math.sin(d1) * Math.sin(d2) + Math.cos(d1) * Math.cos(d2) * Math.cos(dra);
+      const dist = Math.acos(Math.max(-1, Math.min(1, cos2)));
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = star;
+      }
+    }
+
+    if (!nearest) return null;
+
+    // Back-project the star position to photo pixel coords
+    const starProj = project(nearest.ra, nearest.dec);
+    const dsprojX = starProj.x - centerProj.x;
+    const dsprojY = starProj.y - centerProj.y;
+    // Inverse rotation
+    const dphotoX = (cos * dsprojX + sin * dsprojY) / pxPerPx;
+    const dphotoY = (-sin * dsprojX + cos * dsprojY) / pxPerPx;
+    const starPhotoX = cx + dphotoX;
+    const starPhotoY = cy + dphotoY;
+
+    correspondences.push({
+      pointIndex: idx,
+      photoX: starPhotoX,
+      photoY: starPhotoY,
+      starHip: nearest.hip,
+      starName: nearest.name || nearest.desig || `HIP ${nearest.hip}`,
+    });
+  }
+
+  return correspondences;
 }
