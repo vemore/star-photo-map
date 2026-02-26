@@ -288,7 +288,9 @@ export function wcsToCorrespondences(
     const dx = invCD.a * xi + invCD.b * eta;
     const dy = invCD.c * xi + invCD.d * eta;
     const px = wcs.CRPIX1 + dx;
-    const py = wcs.CRPIX2 + dy;
+    // FITS y convention: y=1 at bottom, increasing upward.
+    // Convert to image/display convention: y=0 at top, increasing downward.
+    const py = imageHeight - (wcs.CRPIX2 + dy);
 
     // Check bounds (with margin)
     if (px >= -50 && px <= imageWidth + 50 && py >= -50 && py <= imageHeight + 50) {

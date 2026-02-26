@@ -983,7 +983,7 @@ function buildSyntheticCorrespondences(
     const dpx = px - cx;
     const dpy = py - cy;
     const projX = centerProj.x + (cos * dpx - sin * dpy) * pxPerPx;
-    const projY = centerProj.y + (sin * dpx + cos * dpy) * pxPerPx;
+    const projY = centerProj.y - (sin * dpx + cos * dpy) * pxPerPx;
     const sky = unproject(projX, projY);
 
     // Find nearest star
@@ -1009,8 +1009,8 @@ function buildSyntheticCorrespondences(
     const dsprojX = starProj.x - centerProj.x;
     const dsprojY = starProj.y - centerProj.y;
     // Inverse rotation
-    const dphotoX = (cos * dsprojX + sin * dsprojY) / pxPerPx;
-    const dphotoY = (-sin * dsprojX + cos * dsprojY) / pxPerPx;
+    const dphotoX = (cos * dsprojX - sin * dsprojY) / pxPerPx;
+    const dphotoY = -(sin * dsprojX + cos * dsprojY) / pxPerPx;
     const starPhotoX = cx + dphotoX;
     const starPhotoY = cy + dphotoY;
 
