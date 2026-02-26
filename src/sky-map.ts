@@ -46,7 +46,7 @@ function starRadius(mag: number): number {
 
 function computeMaxMag(scale: number): number {
   const raw = 6 + Math.log2(scale / 200);
-  return Math.max(6, Math.min(8.5, raw));
+  return Math.max(6, Math.min(11, raw));
 }
 
 // ─── DSO rendering helpers ──────────────────────────────────────────────────
@@ -78,6 +78,10 @@ export class SkyMap {
   private onStarHover: StarHoverCallback | null = null;
   private onDSOHover: DSOHoverCallback | null = null;
   private showDSOs = true;
+  private showStars = true;
+  private showConstellationLines = true;
+  private showConstellationNames = true;
+  private maxMagOverride: number | null = null;
 
   // Pan state
   private isPanning = false;
@@ -114,6 +118,11 @@ export class SkyMap {
     this.showDSOs = show;
     this.render();
   }
+
+  setShowStars(show: boolean) { this.showStars = show; this.render(); }
+  setShowConstellationLines(show: boolean) { this.showConstellationLines = show; this.render(); }
+  setShowConstellationNames(show: boolean) { this.showConstellationNames = show; this.render(); }
+  setMaxMag(mag: number | null) { this.maxMagOverride = mag; this.render(); }
 
   navigateTo(ra: number, dec: number, targetScale = 600) {
     const p = project(ra, dec);
@@ -161,7 +170,7 @@ export class SkyMap {
   private findClosestStar(mx: number, my: number): Star | null {
     const projPt = fromCanvas(mx, my, this.view);
     const stars = getStars();
-    const maxMag = computeMaxMag(this.view.scale);
+    const maxMag = this.maxMagOverride ?? computeMaxMag(this.view.scale);
     let closest: Star | null = null;
     let minDist = Infinity;
     const threshold = 8 / this.view.scale;
@@ -193,7 +202,7 @@ export class SkyMap {
       const before = fromCanvas(mx, my, this.view);
 
       const factor = e.deltaY < 0 ? 1.1 : 1 / 1.1;
-      this.view.scale = Math.max(50, Math.min(10000, this.view.scale * factor));
+      this.view.scale = Math.max(50, Math.min(100000, this.view.scale * factor));
 
       // Adjust center so point under mouse stays
       this.view.centerX = before.x - (mx - this.view.width / 2) / this.view.scale;
@@ -315,16 +324,22 @@ export class SkyMap {
 
     this.renderBackground();
     this.renderGrid();
-    this.renderConstellationLines();
+    if (this.showConstellationLines) {
+      this.renderConstellationLines();
+    }
     if (this.showDSOs) {
       this.renderDSOs();
     }
-    this.renderStars();
-    this.renderStarLabels();
+    if (this.showStars) {
+      this.renderStars();
+      this.renderStarLabels();
+    }
     if (this.showDSOs) {
       this.renderDSOLabels();
     }
-    this.renderConstellationNames();
+    if (this.showConstellationNames) {
+      this.renderConstellationNames();
+    }
 
     ctx.restore();
   }
@@ -430,7 +445,7 @@ export class SkyMap {
   private renderStars() {
     const { ctx, view } = this;
     const stars = getStars();
-    const maxMag = computeMaxMag(view.scale);
+    const maxMag = this.maxMagOverride ?? computeMaxMag(view.scale);
 
     for (const star of stars) {
       if (star.mag > maxMag) continue;

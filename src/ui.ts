@@ -111,6 +111,68 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   toggleRow.appendChild(toggleLabel);
   dsoSection.appendChild(toggleRow);
 
+  // ─── Display controls section ─────────────────────────────────────────────
+  const displaySection = document.createElement('div');
+  displaySection.className = 'display-controls-section';
+
+  const displayTitle = document.createElement('div');
+  displayTitle.className = 'display-controls-title';
+  displayTitle.textContent = 'Affichage';
+  displaySection.appendChild(displayTitle);
+
+  function makeCheckRow(label: string, checked: boolean, onChange: (v: boolean) => void): HTMLElement {
+    const row = document.createElement('label');
+    row.className = 'dso-toggle-label';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = checked;
+    cb.addEventListener('change', () => onChange(cb.checked));
+    row.appendChild(cb);
+    row.append(` ${label}`);
+    return row;
+  }
+
+  displaySection.appendChild(makeCheckRow('Afficher les étoiles', true, (v) => {
+    skyMap.setShowStars(v);
+    magRow.style.opacity = v ? '1' : '0.4';
+    magSlider.disabled = !v;
+  }));
+  displaySection.appendChild(makeCheckRow('Traits des constellations', true, (v) => skyMap.setShowConstellationLines(v)));
+  displaySection.appendChild(makeCheckRow('Noms des constellations', true, (v) => skyMap.setShowConstellationNames(v)));
+
+  // Magnitude slider
+  const magRow = document.createElement('div');
+  magRow.className = 'display-controls-mag-row';
+
+  const magLabelEl = document.createElement('label');
+  magLabelEl.className = 'display-controls-mag-label';
+
+  const magSlider = document.createElement('input');
+  magSlider.type = 'range';
+  magSlider.min = '6';
+  magSlider.max = '11';
+  magSlider.step = '0.5';
+  magSlider.value = '8.5';
+  magSlider.className = 'display-controls-mag-slider';
+
+  const magValue = document.createElement('span');
+  magValue.className = 'display-controls-mag-value';
+  magValue.textContent = '8.5';
+
+  magSlider.addEventListener('input', () => {
+    const v = parseFloat(magSlider.value);
+    magValue.textContent = v.toFixed(1);
+    skyMap.setMaxMag(v);
+  });
+
+  magLabelEl.append('Magnitude max ');
+  magRow.appendChild(magLabelEl);
+  magRow.appendChild(magSlider);
+  magRow.appendChild(magValue);
+  displaySection.appendChild(magRow);
+
+  panel.appendChild(displaySection);
+
   // Search input
   const dsoSearchWrapper = document.createElement('div');
   dsoSearchWrapper.className = 'dso-search-wrapper';

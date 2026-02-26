@@ -583,6 +583,51 @@ html, body {
   margin-top: 4px;
 }
 
+/* ─── Display controls section ─── */
+.display-controls-section {
+  margin-top: 16px;
+  border-top: 1px solid rgba(60, 60, 120, 0.3);
+  padding-top: 12px;
+}
+
+.display-controls-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #99a;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+
+.display-controls-mag-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: #99a;
+  transition: opacity 0.2s;
+}
+
+.display-controls-mag-label {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.display-controls-mag-slider {
+  flex: 1;
+  min-width: 0;
+  accent-color: rgba(80, 100, 200, 0.8);
+  cursor: pointer;
+}
+
+.display-controls-mag-value {
+  min-width: 2.5ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: #bbc;
+}
+
 /* ─── DSO section in side panel ─── */
 .dso-section {
   margin-top: 24px;
