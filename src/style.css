@@ -141,10 +141,15 @@ html, body {
 
 .photo-list-item {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
   padding: 8px 0;
   border-bottom: 1px solid rgba(60, 60, 100, 0.2);
+}
+
+.photo-item-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .photo-item-name {

@@ -149,8 +149,12 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
       controls.appendChild(downBtn);
       controls.appendChild(toggleBtn);
       controls.appendChild(deleteBtn);
-      item.appendChild(name);
-      item.appendChild(controls);
+
+      const topRow = document.createElement('div');
+      topRow.className = 'photo-item-top-row';
+      topRow.appendChild(name);
+      topRow.appendChild(controls);
+      item.appendChild(topRow);
 
       // Per-photo opacity slider
       const opacitySlider = document.createElement('input');
