@@ -342,7 +342,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   // ─── Display controls section (collapsible, open by default) ─────────────
   const { section: displaySection, content: displayContent } = makeSection('Affichage', true);
 
-  function makeCheckRow(label: string, checked: boolean, onChange: (v: boolean) => void): HTMLElement {
+  function makeCheckRow(label: string, checked: boolean, onChange: (v: boolean) => void): HTMLElement & { checkbox: HTMLInputElement } {
     const row = document.createElement('label');
     row.className = 'dso-toggle-label';
     const cb = document.createElement('input');
@@ -351,7 +351,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
     cb.addEventListener('change', () => onChange(cb.checked));
     row.appendChild(cb);
     row.append(` ${label}`);
-    return row;
+    (row as any).checkbox = cb;
+    return row as unknown as HTMLElement & { checkbox: HTMLInputElement };
   }
 
   displayContent.appendChild(makeCheckRow('Afficher les étoiles', true, (v) => {
@@ -362,7 +363,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   displayContent.appendChild(makeCheckRow('Traits des constellations', true, (v) => skyMap.setShowConstellationLines(v)));
   displayContent.appendChild(makeCheckRow('Noms des constellations', true, (v) => skyMap.setShowConstellationNames(v)));
   displayContent.appendChild(makeCheckRow('Noms des étoiles', true, (v) => skyMap.setShowStarLabels(v)));
-  displayContent.appendChild(makeCheckRow('Grille RA/Déc', true, (v) => skyMap.setShowGrid(v)));
+  const gridRow = makeCheckRow('Grille RA/Déc', true, (v) => skyMap.setShowGrid(v));
+  displayContent.appendChild(gridRow);
   displayContent.appendChild(makeCheckRow('Cadres des photos', true, (v) => skyMap.setShowPhotoOutlines(v)));
 
   // Magnitude slider
@@ -588,5 +590,54 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   togglePanel.addEventListener('click', () => {
     panel.classList.toggle('collapsed');
     togglePanel.textContent = panel.classList.contains('collapsed') ? '◀' : '▶';
+  });
+
+  // ─── Keyboard shortcuts ──────────────────────────────────────────────────
+  window.addEventListener('keydown', (e) => {
+    // Ignore when focused on an input/textarea
+    const tag = (document.activeElement?.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea') return;
+
+    const view = skyMap.getView();
+
+    switch (e.key) {
+      case '+':
+      case '=':
+        e.preventDefault();
+        skyMap.zoomBy(1.3);
+        break;
+      case '-':
+        e.preventDefault();
+        skyMap.zoomBy(1 / 1.3);
+        break;
+      case 'ArrowLeft':
+        e.preventDefault();
+        skyMap.panBy(-view.width * 0.1, 0);
+        break;
+      case 'ArrowRight':
+        e.preventDefault();
+        skyMap.panBy(view.width * 0.1, 0);
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        skyMap.panBy(0, -view.height * 0.1);
+        break;
+      case 'ArrowDown':
+        e.preventDefault();
+        skyMap.panBy(0, view.height * 0.1);
+        break;
+      case 'h':
+      case 'H':
+        panel.classList.toggle('collapsed');
+        togglePanel.textContent = panel.classList.contains('collapsed') ? '◀' : '▶';
+        break;
+      case 'g':
+      case 'G': {
+        const newVal = !skyMap.getShowGrid();
+        skyMap.setShowGrid(newVal);
+        gridRow.checkbox.checked = newVal;
+        break;
+      }
+    }
   });
 }

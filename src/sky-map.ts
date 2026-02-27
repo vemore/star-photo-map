@@ -138,6 +138,21 @@ export class SkyMap {
   setPhotoOutlines(outlines: { name: string; corners: Point[] }[]) { this.photoOutlines = outlines; }
   setShowPhotoOutlines(show: boolean) { this.showPhotoOutlines = show; this.render(); }
 
+  zoomBy(factor: number) {
+    this.view.scale = Math.max(50, Math.min(100000, this.view.scale * factor));
+    this.render();
+    this.onViewChange?.();
+  }
+
+  panBy(dxPx: number, dyPx: number) {
+    this.view.centerX += dxPx / this.view.scale;
+    this.view.centerY -= dyPx / this.view.scale;
+    this.render();
+    this.onViewChange?.();
+  }
+
+  getShowGrid() { return this.showGrid; }
+
   navigateTo(ra: number, dec: number, targetScale = 600) {
     const p = project(ra, dec);
     this.view.centerX = p.x;
