@@ -13,6 +13,7 @@ interface PlacedPhoto {
   photo: Photo;
   imgEl: HTMLImageElement;
   visible: boolean;
+  opacity: number;
 }
 
 function starDisplayLabel(star: Star): string {
@@ -89,6 +90,13 @@ export class PhotoOverlay {
     return { ra: avg.ra, dec: avg.dec };
   }
 
+  setPhotoOpacity(photoId: string, opacity: number) {
+    const placed = this.placedPhotos.find(p => p.photo.id === photoId);
+    if (!placed) return;
+    placed.opacity = opacity;
+    placed.imgEl.style.opacity = String(opacity);
+  }
+
   toggleVisibility(photoId: string) {
     const placed = this.placedPhotos.find(p => p.photo.id === photoId);
     if (!placed) return;
@@ -150,7 +158,8 @@ export class PhotoOverlay {
     img.draggable = false;
     this.container.appendChild(img);
 
-    const placed: PlacedPhoto = { photo, imgEl: img, visible: true };
+    img.style.opacity = '0.7';
+    const placed: PlacedPhoto = { photo, imgEl: img, visible: true, opacity: 0.7 };
     this.placedPhotos.push(placed);
 
     img.onload = () => {

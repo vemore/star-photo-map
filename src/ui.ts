@@ -147,6 +147,20 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
       controls.appendChild(deleteBtn);
       item.appendChild(name);
       item.appendChild(controls);
+
+      // Per-photo opacity slider
+      const opacitySlider = document.createElement('input');
+      opacitySlider.type = 'range';
+      opacitySlider.min = '0';
+      opacitySlider.max = '1';
+      opacitySlider.step = '0.05';
+      opacitySlider.value = String(placed.opacity);
+      opacitySlider.className = 'photo-opacity-slider';
+      opacitySlider.addEventListener('input', () => {
+        overlay.setPhotoOpacity(placed.photo.id, parseFloat(opacitySlider.value));
+      });
+      item.appendChild(opacitySlider);
+
       photoList.appendChild(item);
     }
   }
