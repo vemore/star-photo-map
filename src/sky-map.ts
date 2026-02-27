@@ -280,7 +280,7 @@ export class SkyMap {
     if (!this.showDSOs) return null;
     const projPt = fromCanvas(mx, my, this.view);
     const dsos = getDSOs();
-    const maxMag = computeMaxMag(this.view.scale) + 4;
+    const maxMag = (this.maxMagOverride ?? computeMaxMag(this.view.scale)) + 4;
     let closest: DSO | null = null;
     let minDist = Infinity;
     const threshold = 20 / this.view.scale;
@@ -508,7 +508,7 @@ export class SkyMap {
     const { ctx, view } = this;
     const dsos = getDSOs();
     // Magnitude cutoff: slightly more generous than stars
-    const maxMag = 6 + Math.log2(view.scale / 200) * 1.5;
+    const maxMag = this.maxMagOverride ?? (6 + Math.log2(view.scale / 200) * 1.5);
 
     for (const dso of dsos) {
       if (dso.mag !== null && dso.mag > maxMag) continue;
@@ -693,7 +693,7 @@ export class SkyMap {
   private renderDSOLabels() {
     const { ctx, view } = this;
     const dsos = getDSOs();
-    const maxMag = 6 + Math.log2(view.scale / 200) * 1.5;
+    const maxMag = this.maxMagOverride ?? (6 + Math.log2(view.scale / 200) * 1.5);
 
     const TYPE_COLORS: Record<string, string> = {
       'Gx':  'rgba(220, 180, 100, 0.8)',
