@@ -46,7 +46,13 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
       return;
     }
 
-    const correspondences = JSON.parse(corrJson);
+    let correspondences: any[];
+    try {
+      correspondences = JSON.parse(corrJson);
+    } catch {
+      res.status(400).json({ error: 'JSON des correspondances invalide' });
+      return;
+    }
     if (!Array.isArray(correspondences) || correspondences.length < 3) {
       res.status(400).json({ error: 'Au moins 3 correspondances requises' });
       return;

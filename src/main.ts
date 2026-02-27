@@ -10,6 +10,13 @@ async function init() {
   // Load star and DSO catalogs in parallel
   await Promise.all([loadCatalog(), loadDSOCatalog()]);
 
+  // Remove loading overlay
+  const loadingOverlay = document.getElementById('loading-overlay');
+  if (loadingOverlay) {
+    loadingOverlay.classList.add('fade-out');
+    loadingOverlay.addEventListener('transitionend', () => loadingOverlay.remove());
+  }
+
   // Init sky map
   const canvas = document.getElementById('sky-canvas') as HTMLCanvasElement;
   const skyMap = new SkyMap(canvas);

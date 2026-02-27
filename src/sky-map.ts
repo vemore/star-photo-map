@@ -2,6 +2,7 @@ import type { Star, DSO, ViewState, Point } from './types';
 import { project, toCanvas, fromCanvas, unproject } from './projection';
 import { getStars, getConstellationLines, getConstellationInfos } from './star-catalog';
 import { getDSOs } from './dso-catalog';
+import { SpatialIndex } from './spatial-index';
 
 const DEG2RAD = Math.PI / 180;
 
@@ -90,6 +91,12 @@ export class SkyMap {
   private photoOutlines: { name: string; corners: Point[] }[] = [];
   private showPhotoOutlines = true;
 
+  // Spatial indexes for fast hover detection
+  private starIndex = new SpatialIndex<Star>(0.02);
+  private dsoIndex = new SpatialIndex<DSO>(0.02);
+  private starIndexMaxMag = -1;
+  private dsoIndexMaxMag = -1;
+
   // Pan state
   private isPanning = false;
   private panStartX = 0;
@@ -99,6 +106,9 @@ export class SkyMap {
 
   // Animation
   private animationId: number | null = null;
+
+  // Bound event handlers for cleanup
+  private boundHandlers: { target: EventTarget; event: string; handler: EventListener }[] = [];
 
   // Picking mode
   private pickingMode = false;
@@ -133,7 +143,7 @@ export class SkyMap {
   setShowConstellationLines(show: boolean) { this.showConstellationLines = show; this.render(); }
   setShowConstellationNames(show: boolean) { this.showConstellationNames = show; this.render(); }
   setMaxMag(mag: number | null) { this.maxMagOverride = mag; this.render(); }
-  setVisibleDSOTypes(types: Set<string>) { this.visibleDSOTypes = types; this.render(); }
+  setVisibleDSOTypes(types: Set<string>) { this.visibleDSOTypes = types; this.dsoIndexMaxMag = -1; this.render(); }
   setShowGrid(show: boolean) { this.showGrid = show; this.render(); }
   setShowStarLabels(show: boolean) { this.showStarLabels = show; this.render(); }
   setSkyOpacity(v: number) { this.skyOpacity = v; this.render(); }
@@ -245,32 +255,46 @@ export class SkyMap {
     this.onViewChange?.();
   }
 
-  private findClosestStar(mx: number, my: number): Star | null {
-    const projPt = fromCanvas(mx, my, this.view);
-    const stars = getStars();
-    const maxMag = this.maxMagOverride ?? computeMaxMag(this.view.scale);
-    let closest: Star | null = null;
-    let minDist = Infinity;
-    const threshold = 8 / this.view.scale;
-
-    for (const star of stars) {
+  private buildStarIndex(maxMag: number) {
+    if (maxMag === this.starIndexMaxMag) return;
+    this.starIndexMaxMag = maxMag;
+    this.starIndex.clear();
+    for (const star of getStars()) {
       if (star.mag > maxMag) continue;
-      const sp = project(star.ra, star.dec);
-      const dx = sp.x - projPt.x;
-      const dy = sp.y - projPt.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < threshold && dist < minDist) {
-        minDist = dist;
-        closest = star;
-      }
+      const p = project(star.ra, star.dec);
+      this.starIndex.insert(star, p.x, p.y);
     }
+  }
 
-    return closest;
+  private buildDSOIndex(maxMag: number) {
+    if (maxMag === this.dsoIndexMaxMag) return;
+    this.dsoIndexMaxMag = maxMag;
+    this.dsoIndex.clear();
+    for (const dso of getDSOs()) {
+      if (!this.visibleDSOTypes.has(dso.type)) continue;
+      if (dso.mag !== null && dso.mag > maxMag) continue;
+      if (dso.mag === null && this.maxMagOverride !== null) continue;
+      const p = project(dso.ra, dso.dec);
+      this.dsoIndex.insert(dso, p.x, p.y);
+    }
+  }
+
+  private findClosestStar(mx: number, my: number): Star | null {
+    const maxMag = this.maxMagOverride ?? computeMaxMag(this.view.scale);
+    this.buildStarIndex(maxMag);
+    const projPt = fromCanvas(mx, my, this.view);
+    const threshold = 8 / this.view.scale;
+    return this.starIndex.findNearest(projPt.x, projPt.y, threshold);
+  }
+
+  private addEvent(target: EventTarget, event: string, handler: EventListener, options?: AddEventListenerOptions) {
+    target.addEventListener(event, handler, options);
+    this.boundHandlers.push({ target, event, handler });
   }
 
   private setupEvents() {
     // Zoom with mouse wheel
-    this.canvas.addEventListener('wheel', (e) => {
+    this.addEvent(this.canvas, 'wheel', ((e: WheelEvent) => {
       e.preventDefault();
       this.cancelAnimation();
       const rect = this.canvas.getBoundingClientRect();
@@ -289,10 +313,10 @@ export class SkyMap {
 
       this.render();
       this.onViewChange?.();
-    }, { passive: false });
+    }) as EventListener, { passive: false });
 
     // Pan with mouse drag
-    this.canvas.addEventListener('mousedown', (e) => {
+    this.addEvent(this.canvas, 'mousedown', ((e: MouseEvent) => {
       this.cancelAnimation();
       if (e.button === 0) {
         this.isPanning = true;
@@ -304,9 +328,9 @@ export class SkyMap {
           this.canvas.style.cursor = 'grabbing';
         }
       }
-    });
+    }) as EventListener);
 
-    window.addEventListener('mousemove', (e) => {
+    this.addEvent(window, 'mousemove', ((e: MouseEvent) => {
       if (this.isPanning) {
         const dx = e.clientX - this.panStartX;
         const dy = e.clientY - this.panStartY;
@@ -324,9 +348,9 @@ export class SkyMap {
           this.handleHover(mx, my, e.clientX, e.clientY);
         }
       }
-    });
+    }) as EventListener);
 
-    window.addEventListener('mouseup', (e) => {
+    this.addEvent(window, 'mouseup', ((e: MouseEvent) => {
       if (this.isPanning) {
         const dx = e.clientX - this.panStartX;
         const dy = e.clientY - this.panStartY;
@@ -346,40 +370,31 @@ export class SkyMap {
           }
         }
       }
-    });
+    }) as EventListener);
 
     // Escape exits picking mode
-    window.addEventListener('keydown', (e) => {
+    this.addEvent(window, 'keydown', ((e: KeyboardEvent) => {
       if (e.key === 'Escape' && this.pickingMode) {
         this.exitPickingMode();
       }
-    });
+    }) as EventListener);
+  }
+
+  destroy() {
+    this.cancelAnimation();
+    for (const { target, event, handler } of this.boundHandlers) {
+      target.removeEventListener(event, handler);
+    }
+    this.boundHandlers = [];
   }
 
   private findClosestDSO(mx: number, my: number): DSO | null {
     if (!this.showDSOs) return null;
-    const projPt = fromCanvas(mx, my, this.view);
-    const dsos = getDSOs();
     const maxMag = (this.maxMagOverride ?? computeMaxMag(this.view.scale)) + 4;
-    let closest: DSO | null = null;
-    let minDist = Infinity;
+    this.buildDSOIndex(maxMag);
+    const projPt = fromCanvas(mx, my, this.view);
     const threshold = 20 / this.view.scale;
-
-    for (const dso of dsos) {
-      if (!this.visibleDSOTypes.has(dso.type)) continue;
-      if (dso.mag !== null && dso.mag > maxMag) continue;
-      if (dso.mag === null && this.maxMagOverride !== null) continue;
-      const sp = project(dso.ra, dso.dec);
-      const dx = sp.x - projPt.x;
-      const dy = sp.y - projPt.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      if (dist < threshold && dist < minDist) {
-        minDist = dist;
-        closest = dso;
-      }
-    }
-
-    return closest;
+    return this.dsoIndex.findNearest(projPt.x, projPt.y, threshold);
   }
 
   private handleHover(mx: number, my: number, clientX: number, clientY: number) {
