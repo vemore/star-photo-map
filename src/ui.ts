@@ -48,7 +48,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
       return;
     }
 
-    for (const placed of photos) {
+    for (let i = 0; i < photos.length; i++) {
+      const placed = photos[i];
       const item = document.createElement('div');
       item.className = 'photo-list-item';
 
@@ -66,6 +67,24 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
 
       const controls = document.createElement('div');
       controls.className = 'photo-item-controls';
+
+      const upBtn = document.createElement('button');
+      upBtn.className = 'btn-icon';
+      upBtn.title = 'Mettre devant';
+      upBtn.textContent = '▲';
+      upBtn.disabled = i >= photos.length - 1;
+      upBtn.addEventListener('click', () => {
+        overlay.movePhotoUp(placed.photo.id);
+      });
+
+      const downBtn = document.createElement('button');
+      downBtn.className = 'btn-icon';
+      downBtn.title = 'Mettre derrière';
+      downBtn.textContent = '▼';
+      downBtn.disabled = i <= 0;
+      downBtn.addEventListener('click', () => {
+        overlay.movePhotoDown(placed.photo.id);
+      });
 
       const toggleBtn = document.createElement('button');
       toggleBtn.className = 'btn-icon';
@@ -86,6 +105,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
         }
       });
 
+      controls.appendChild(upBtn);
+      controls.appendChild(downBtn);
       controls.appendChild(toggleBtn);
       controls.appendChild(deleteBtn);
       item.appendChild(name);

@@ -99,6 +99,28 @@ export class PhotoOverlay {
     }
   }
 
+  movePhotoUp(photoId: string) {
+    const idx = this.placedPhotos.findIndex(p => p.photo.id === photoId);
+    if (idx < 0 || idx >= this.placedPhotos.length - 1) return;
+    [this.placedPhotos[idx], this.placedPhotos[idx + 1]] = [this.placedPhotos[idx + 1], this.placedPhotos[idx]];
+    this.reorderDOM();
+    this.onPhotosChanged?.();
+  }
+
+  movePhotoDown(photoId: string) {
+    const idx = this.placedPhotos.findIndex(p => p.photo.id === photoId);
+    if (idx <= 0) return;
+    [this.placedPhotos[idx], this.placedPhotos[idx - 1]] = [this.placedPhotos[idx - 1], this.placedPhotos[idx]];
+    this.reorderDOM();
+    this.onPhotosChanged?.();
+  }
+
+  private reorderDOM() {
+    for (const placed of this.placedPhotos) {
+      this.container.appendChild(placed.imgEl);
+    }
+  }
+
   async removePhoto(photoId: string) {
     await deletePhotoAPI(photoId);
     const idx = this.placedPhotos.findIndex(p => p.photo.id === photoId);
