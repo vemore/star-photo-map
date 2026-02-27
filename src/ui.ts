@@ -56,6 +56,13 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
       name.className = 'photo-item-name';
       name.textContent = placed.photo.originalName;
       name.title = placed.photo.originalName;
+      name.style.cursor = 'pointer';
+      name.addEventListener('click', () => {
+        const center = overlay.getPhotoCenter(placed.photo.id);
+        if (center) {
+          skyMap.navigateTo(center.ra, center.dec, 600);
+        }
+      });
 
       const controls = document.createElement('div');
       controls.className = 'photo-item-controls';

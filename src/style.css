@@ -137,6 +137,10 @@ html, body {
   color: #aab;
 }
 
+.photo-item-name:hover {
+  color: #ccf;
+}
+
 .photo-item-controls {
   display: flex;
   gap: 6px;

@@ -69,6 +69,26 @@ export class PhotoOverlay {
     return this.placedPhotos;
   }
 
+  /** Compute the average RA/Dec center of a photo from its star correspondences */
+  getPhotoCenter(photoId: string): { ra: number; dec: number } | null {
+    const placed = this.placedPhotos.find(p => p.photo.id === photoId);
+    if (!placed || placed.photo.correspondences.length === 0) return null;
+
+    let sumX = 0, sumY = 0, count = 0;
+    for (const corr of placed.photo.correspondences) {
+      const star = getStarByHip(corr.starHip);
+      if (!star) continue;
+      const p = project(star.ra, star.dec);
+      sumX += p.x;
+      sumY += p.y;
+      count++;
+    }
+    if (count === 0) return null;
+
+    const avg = unproject(sumX / count, sumY / count);
+    return { ra: avg.ra, dec: avg.dec };
+  }
+
   toggleVisibility(photoId: string) {
     const placed = this.placedPhotos.find(p => p.photo.id === photoId);
     if (!placed) return;
