@@ -425,7 +425,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   }
 
   displayContent.appendChild(makeSliderRow('Opacité ciel', 0, 1, 0.05, 0.8, (v) => skyMap.setSkyOpacity(v)));
-  displayContent.appendChild(makeSliderRow('Fond', 0, 1, 0.05, 1, (v) => skyMap.setBackgroundOpacity(v)));
+  displayContent.appendChild(makeSliderRow('Gradient de fond', 0, 1, 0.05, 1, (v) => skyMap.setBackgroundOpacity(v)));
 
   panel.appendChild(displaySection);
 
