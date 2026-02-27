@@ -83,6 +83,8 @@ export class SkyMap {
   private showConstellationNames = true;
   private maxMagOverride: number | null = null;
   private visibleDSOTypes: Set<string> = new Set(['Gx', 'OC', 'GC', 'EN', 'RN', 'PN', 'SNR', 'DN', '?']);
+  private showGrid = true;
+  private showStarLabels = true;
 
   // Pan state
   private isPanning = false;
@@ -125,6 +127,8 @@ export class SkyMap {
   setShowConstellationNames(show: boolean) { this.showConstellationNames = show; this.render(); }
   setMaxMag(mag: number | null) { this.maxMagOverride = mag; this.render(); }
   setVisibleDSOTypes(types: Set<string>) { this.visibleDSOTypes = types; this.render(); }
+  setShowGrid(show: boolean) { this.showGrid = show; this.render(); }
+  setShowStarLabels(show: boolean) { this.showStarLabels = show; this.render(); }
 
   navigateTo(ra: number, dec: number, targetScale = 600) {
     const p = project(ra, dec);
@@ -326,7 +330,9 @@ export class SkyMap {
     ctx.clearRect(0, 0, width, height);
 
     this.renderBackground();
-    this.renderGrid();
+    if (this.showGrid) {
+      this.renderGrid();
+    }
     if (this.showConstellationLines) {
       this.renderConstellationLines();
     }
@@ -335,7 +341,9 @@ export class SkyMap {
     }
     if (this.showStars) {
       this.renderStars();
-      this.renderStarLabels();
+      if (this.showStarLabels) {
+        this.renderStarLabels();
+      }
     }
     if (this.showDSOs) {
       this.renderDSOLabels();

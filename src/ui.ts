@@ -323,6 +323,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   }));
   displaySection.appendChild(makeCheckRow('Traits des constellations', true, (v) => skyMap.setShowConstellationLines(v)));
   displaySection.appendChild(makeCheckRow('Noms des constellations', true, (v) => skyMap.setShowConstellationNames(v)));
+  displaySection.appendChild(makeCheckRow('Noms des étoiles', true, (v) => skyMap.setShowStarLabels(v)));
+  displaySection.appendChild(makeCheckRow('Grille RA/Déc', true, (v) => skyMap.setShowGrid(v)));
 
   // Magnitude slider
   const magRow = document.createElement('div');
