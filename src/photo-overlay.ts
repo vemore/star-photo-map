@@ -565,6 +565,26 @@ export class PhotoOverlay {
       updateActiveIndex();
     }
 
+    function resetStarSelection(idx: number) {
+      if (!points[idx]) return;
+      points[idx]!.starHip = 0;
+      points[idx]!.starName = '';
+      searchInputs[idx].disabled = false;
+      searchInputs[idx].value = '';
+      if (pickBtns[idx]) pickBtns[idx].disabled = false;
+      statusLabels[idx].textContent = 'Position définie';
+      statusLabels[idx].className = 'point-status';
+      statusLabels[idx].onclick = null;
+      pointEntries[idx].classList.remove('complete');
+      updateActiveIndex();
+      checkComplete();
+      searchInputs[idx].focus();
+    }
+
+    function markStarComplete(idx: number) {
+      statusLabels[idx].onclick = () => resetStarSelection(idx);
+    }
+
     function selectStar(idx: number, star: Star, label: string) {
       if (!points[idx]) return;
       points[idx]!.starHip = star.hip;
@@ -580,6 +600,7 @@ export class PhotoOverlay {
         pickBtns[idx].disabled = true;
       }
 
+      markStarComplete(idx);
       updateActiveIndex();
       checkComplete();
     }
@@ -639,6 +660,7 @@ export class PhotoOverlay {
           searchInputs[idx].disabled = true;
           pointEntries[idx].classList.add('complete');
           if (pickBtns[idx]) pickBtns[idx].disabled = true;
+          markStarComplete(idx);
           updateActiveIndex();
           checkComplete();
         }

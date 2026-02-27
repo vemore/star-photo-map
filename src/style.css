@@ -342,6 +342,11 @@ html, body {
 
 .point-complete {
   color: #8c8;
+  cursor: pointer;
+}
+
+.point-complete:hover {
+  text-decoration: underline;
 }
 
 .search-wrapper {
