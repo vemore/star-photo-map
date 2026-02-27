@@ -120,6 +120,66 @@ export class PhotoOverlay {
     return results;
   }
 
+  /** Compute the center RA/Dec and ideal scale to fit a photo in the viewport */
+  getPhotoCenterAndScale(photoId: string, viewWidth: number, viewHeight: number): { ra: number; dec: number; scale: number } | null {
+    const placed = this.placedPhotos.find(p => p.photo.id === photoId);
+    if (!placed || placed.photo.correspondences.length < 3) return null;
+
+    const photoPoints: Point[] = [];
+    const projPoints: Point[] = [];
+
+    for (const corr of placed.photo.correspondences) {
+      const star = getStarByHip(corr.starHip);
+      if (!star) continue;
+      const proj = project(star.ra, star.dec);
+      photoPoints.push({ x: corr.photoX, y: corr.photoY });
+      projPoints.push(proj);
+    }
+
+    if (photoPoints.length < 3) return null;
+
+    try {
+      const matrix = photoPoints.length === 3
+        ? computeAffineTransform(photoPoints as [Point, Point, Point], projPoints as [Point, Point, Point])
+        : computeAffineLSQ(photoPoints, projPoints);
+
+      const w = placed.imgEl.naturalWidth || placed.photo.width;
+      const h = placed.imgEl.naturalHeight || placed.photo.height;
+
+      const photoCorners = [
+        { x: 0, y: 0 }, { x: w, y: 0 },
+        { x: w, y: h }, { x: 0, y: h },
+      ];
+
+      const projCorners = photoCorners.map(p => ({
+        x: matrix.a * p.x + matrix.c * p.y + matrix.e,
+        y: matrix.b * p.x + matrix.d * p.y + matrix.f,
+      }));
+
+      // Bounding box in projection space
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const c of projCorners) {
+        if (c.x < minX) minX = c.x;
+        if (c.x > maxX) maxX = c.x;
+        if (c.y < minY) minY = c.y;
+        if (c.y > maxY) maxY = c.y;
+      }
+
+      const centerProj = { x: (minX + maxX) / 2, y: (minY + maxY) / 2 };
+      const center = unproject(centerProj.x, centerProj.y);
+
+      // Scale to fit: projection extent * scale = viewport pixels
+      // Add 20% margin
+      const extentX = maxX - minX;
+      const extentY = maxY - minY;
+      const scale = Math.min(viewWidth / extentX, viewHeight / extentY) * 0.8;
+
+      return { ra: center.ra, dec: center.dec, scale };
+    } catch {
+      return null;
+    }
+  }
+
   /** Compute the average RA/Dec center of a photo from its star correspondences */
   getPhotoCenter(photoId: string): { ra: number; dec: number } | null {
     const placed = this.placedPhotos.find(p => p.photo.id === photoId);

@@ -99,9 +99,10 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
       name.title = placed.photo.originalName;
       name.style.cursor = 'pointer';
       name.addEventListener('click', () => {
-        const center = overlay.getPhotoCenter(placed.photo.id);
-        if (center) {
-          skyMap.navigateTo(center.ra, center.dec, 600);
+        const view = skyMap.getView();
+        const fit = overlay.getPhotoCenterAndScale(placed.photo.id, view.width, view.height);
+        if (fit) {
+          skyMap.navigateTo(fit.ra, fit.dec, fit.scale);
         }
       });
 
@@ -263,7 +264,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
         item.addEventListener('click', () => {
           starInput.value = result.label;
           starDropdown.style.display = 'none';
-          skyMap.navigateTo(result.ra, result.dec, 600);
+          skyMap.navigateTo(result.ra, result.dec, skyMap.getView().scale);
           showStarInfo(result);
         });
         starDropdown.appendChild(item);
@@ -499,7 +500,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
           : `HIP ${star.hip}`;
         starEl.textContent = `${name} (mag ${star.mag.toFixed(1)})`;
         starEl.addEventListener('click', () => {
-          skyMap.navigateTo(star.ra, star.dec, 600);
+          skyMap.navigateTo(star.ra, star.dec, skyMap.getView().scale);
         });
         nearbyPanel.appendChild(starEl);
       }
@@ -528,7 +529,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
       item.addEventListener('click', () => {
         dsoInput.value = result.label;
         dsoDropdown.style.display = 'none';
-        skyMap.navigateTo(result.dso.ra, result.dso.dec, 600);
+        skyMap.navigateTo(result.dso.ra, result.dso.dec, skyMap.getView().scale);
         showDSOInfo(result.dso);
       });
       dsoDropdown.appendChild(item);
