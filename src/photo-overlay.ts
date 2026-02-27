@@ -54,6 +54,7 @@ export class PhotoOverlay {
     for (const photo of photos) {
       this.addPhotoToMap(photo);
     }
+    this.onPhotosChanged?.();
   }
 
   /** Recalculate all photo transforms (call on zoom/pan/resize) */
