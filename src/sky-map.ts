@@ -85,6 +85,8 @@ export class SkyMap {
   private visibleDSOTypes: Set<string> = new Set(['Gx', 'OC', 'GC', 'EN', 'RN', 'PN', 'SNR', 'DN', '?']);
   private showGrid = true;
   private showStarLabels = true;
+  private skyOpacity = 0.8;
+  private backgroundOpacity = 1.0;
 
   // Pan state
   private isPanning = false;
@@ -129,6 +131,8 @@ export class SkyMap {
   setVisibleDSOTypes(types: Set<string>) { this.visibleDSOTypes = types; this.render(); }
   setShowGrid(show: boolean) { this.showGrid = show; this.render(); }
   setShowStarLabels(show: boolean) { this.showStarLabels = show; this.render(); }
+  setSkyOpacity(v: number) { this.skyOpacity = v; this.render(); }
+  setBackgroundOpacity(v: number) { this.backgroundOpacity = v; this.render(); }
 
   navigateTo(ra: number, dec: number, targetScale = 600) {
     const p = project(ra, dec);
@@ -330,6 +334,7 @@ export class SkyMap {
     ctx.clearRect(0, 0, width, height);
 
     this.renderBackground();
+    ctx.globalAlpha = this.skyOpacity;
     if (this.showGrid) {
       this.renderGrid();
     }
@@ -361,11 +366,19 @@ export class SkyMap {
     const cy = view.height / 2;
     const maxR = Math.sqrt(view.width * view.width + view.height * view.height);
 
+    // Solid black base
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, view.width, view.height);
+
+    // Gradient overlay with adjustable opacity
+    ctx.save();
+    ctx.globalAlpha = this.backgroundOpacity;
     const gradient = ctx.createRadialGradient(cx, cy, 0, cx, cy, maxR);
     gradient.addColorStop(0, '#0a0a2e');
     gradient.addColorStop(1, '#000008');
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, view.width, view.height);
+    ctx.restore();
   }
 
   private renderGrid() {
@@ -545,7 +558,7 @@ export class SkyMap {
       const opacity = Math.min(1, Math.max(0.3, 1 - (mag - 4) * 0.07));
 
       ctx.save();
-      ctx.globalAlpha = opacity;
+      ctx.globalAlpha = opacity * this.skyOpacity;
       ctx.translate(c.x, c.y);
       ctx.rotate(angle);
 

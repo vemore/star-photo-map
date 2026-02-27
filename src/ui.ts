@@ -357,6 +357,37 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   magRow.appendChild(magValue);
   displaySection.appendChild(magRow);
 
+  // Opacity sliders
+  function makeSliderRow(label: string, min: number, max: number, step: number, defaultVal: number, onChange: (v: number) => void): HTMLElement {
+    const row = document.createElement('div');
+    row.className = 'display-controls-mag-row';
+    const lbl = document.createElement('label');
+    lbl.className = 'display-controls-mag-label';
+    lbl.textContent = label + ' ';
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.min = String(min);
+    slider.max = String(max);
+    slider.step = String(step);
+    slider.value = String(defaultVal);
+    slider.className = 'display-controls-mag-slider';
+    const val = document.createElement('span');
+    val.className = 'display-controls-mag-value';
+    val.textContent = defaultVal.toFixed(2);
+    slider.addEventListener('input', () => {
+      const v = parseFloat(slider.value);
+      val.textContent = v.toFixed(2);
+      onChange(v);
+    });
+    row.appendChild(lbl);
+    row.appendChild(slider);
+    row.appendChild(val);
+    return row;
+  }
+
+  displaySection.appendChild(makeSliderRow('Opacité ciel', 0, 1, 0.05, 0.8, (v) => skyMap.setSkyOpacity(v)));
+  displaySection.appendChild(makeSliderRow('Fond', 0, 1, 0.05, 1, (v) => skyMap.setBackgroundOpacity(v)));
+
   panel.appendChild(displaySection);
 
   // Search input
