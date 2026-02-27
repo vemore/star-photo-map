@@ -23,11 +23,47 @@ function formatSize(majAxis: number | null, minAxis: number | null): string {
   return `${maj} × ${min}`;
 }
 
+function makeSection(title: string, defaultOpen: boolean): { section: HTMLElement, content: HTMLElement } {
+  const section = document.createElement('div');
+  section.className = 'sidebar-section';
+  if (!defaultOpen) section.classList.add('collapsed');
+
+  const header = document.createElement('div');
+  header.className = 'sidebar-section-header';
+
+  const titleEl = document.createElement('span');
+  titleEl.textContent = title;
+
+  const chevron = document.createElement('span');
+  chevron.className = 'sidebar-section-chevron';
+  chevron.textContent = '▾';
+
+  header.appendChild(titleEl);
+  header.appendChild(chevron);
+  section.appendChild(header);
+
+  const content = document.createElement('div');
+  content.className = 'sidebar-section-content';
+  section.appendChild(content);
+
+  header.addEventListener('click', () => {
+    section.classList.toggle('collapsed');
+  });
+
+  return { section, content };
+}
+
 export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   // Side panel
   const panel = document.getElementById('side-panel')!;
   const photoList = document.getElementById('photo-list')!;
   const addBtn = document.getElementById('add-photo-btn')!;
+
+  // ─── Photos section (collapsible, open by default) ─────────────────────
+  const { section: photoSection, content: photoContent } = makeSection('Photos', true);
+  photoContent.appendChild(addBtn);
+  photoContent.appendChild(photoList);
+  panel.appendChild(photoSection);
 
   addBtn.addEventListener('click', () => {
     overlay.openRegistrationModal();
@@ -117,13 +153,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
 
   refreshPhotoList();
 
-  // ─── Star search section ──────────────────────────────────────────────────
-  const starSection = document.createElement('div');
-  starSection.className = 'star-search-section';
-
-  const starTitle = document.createElement('h2');
-  starTitle.textContent = 'Étoiles';
-  starSection.appendChild(starTitle);
+  // ─── Star search section (collapsible, closed by default) ─────────────────
+  const { section: starSection, content: starContent } = makeSection('Étoiles', false);
 
   const starSearchWrapper = document.createElement('div');
   starSearchWrapper.className = 'dso-search-wrapper';
@@ -138,12 +169,12 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
 
   starSearchWrapper.appendChild(starInput);
   starSearchWrapper.appendChild(starDropdown);
-  starSection.appendChild(starSearchWrapper);
+  starContent.appendChild(starSearchWrapper);
 
   const starInfoPanel = document.createElement('div');
   starInfoPanel.className = 'dso-info-panel';
   starInfoPanel.style.display = 'none';
-  starSection.appendChild(starInfoPanel);
+  starContent.appendChild(starInfoPanel);
 
   panel.appendChild(starSection);
 
@@ -228,13 +259,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
     }
   });
 
-  // ─── DSO section ────────────────────────────────────────────────────────────
-  const dsoSection = document.createElement('div');
-  dsoSection.className = 'dso-section';
-
-  const dsoTitle = document.createElement('h2');
-  dsoTitle.textContent = 'Objets du ciel profond';
-  dsoSection.appendChild(dsoTitle);
+  // ─── DSO section (collapsible, closed by default) ──────────────────────────
+  const { section: dsoSection, content: dsoContent } = makeSection('Objets du ciel profond', false);
 
   // Toggle checkbox
   const toggleRow = document.createElement('div');
@@ -247,7 +273,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   toggleLabel.appendChild(toggleCheck);
   toggleLabel.append(' Afficher les DSO');
   toggleRow.appendChild(toggleLabel);
-  dsoSection.appendChild(toggleRow);
+  dsoContent.appendChild(toggleRow);
 
   // DSO type sub-toggles
   const dsoTypeToggles = document.createElement('div');
@@ -285,7 +311,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
     dsoTypeToggles.appendChild(typeRow);
   }
 
-  dsoSection.appendChild(dsoTypeToggles);
+  dsoContent.appendChild(dsoTypeToggles);
 
   toggleCheck.addEventListener('change', () => {
     skyMap.setShowDSOs(toggleCheck.checked);
@@ -295,14 +321,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
     dsoTypeToggles.style.opacity = toggleCheck.checked ? '1' : '0.4';
   });
 
-  // ─── Display controls section ─────────────────────────────────────────────
-  const displaySection = document.createElement('div');
-  displaySection.className = 'display-controls-section';
-
-  const displayTitle = document.createElement('div');
-  displayTitle.className = 'display-controls-title';
-  displayTitle.textContent = 'Affichage';
-  displaySection.appendChild(displayTitle);
+  // ─── Display controls section (collapsible, open by default) ─────────────
+  const { section: displaySection, content: displayContent } = makeSection('Affichage', true);
 
   function makeCheckRow(label: string, checked: boolean, onChange: (v: boolean) => void): HTMLElement {
     const row = document.createElement('label');
@@ -316,15 +336,15 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
     return row;
   }
 
-  displaySection.appendChild(makeCheckRow('Afficher les étoiles', true, (v) => {
+  displayContent.appendChild(makeCheckRow('Afficher les étoiles', true, (v) => {
     skyMap.setShowStars(v);
     magRow.style.opacity = v ? '1' : '0.4';
     magSlider.disabled = !v;
   }));
-  displaySection.appendChild(makeCheckRow('Traits des constellations', true, (v) => skyMap.setShowConstellationLines(v)));
-  displaySection.appendChild(makeCheckRow('Noms des constellations', true, (v) => skyMap.setShowConstellationNames(v)));
-  displaySection.appendChild(makeCheckRow('Noms des étoiles', true, (v) => skyMap.setShowStarLabels(v)));
-  displaySection.appendChild(makeCheckRow('Grille RA/Déc', true, (v) => skyMap.setShowGrid(v)));
+  displayContent.appendChild(makeCheckRow('Traits des constellations', true, (v) => skyMap.setShowConstellationLines(v)));
+  displayContent.appendChild(makeCheckRow('Noms des constellations', true, (v) => skyMap.setShowConstellationNames(v)));
+  displayContent.appendChild(makeCheckRow('Noms des étoiles', true, (v) => skyMap.setShowStarLabels(v)));
+  displayContent.appendChild(makeCheckRow('Grille RA/Déc', true, (v) => skyMap.setShowGrid(v)));
 
   // Magnitude slider
   const magRow = document.createElement('div');
@@ -355,7 +375,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   magRow.appendChild(magLabelEl);
   magRow.appendChild(magSlider);
   magRow.appendChild(magValue);
-  displaySection.appendChild(magRow);
+  displayContent.appendChild(magRow);
 
   // Opacity sliders
   function makeSliderRow(label: string, min: number, max: number, step: number, defaultVal: number, onChange: (v: number) => void): HTMLElement {
@@ -385,8 +405,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
     return row;
   }
 
-  displaySection.appendChild(makeSliderRow('Opacité ciel', 0, 1, 0.05, 0.8, (v) => skyMap.setSkyOpacity(v)));
-  displaySection.appendChild(makeSliderRow('Fond', 0, 1, 0.05, 1, (v) => skyMap.setBackgroundOpacity(v)));
+  displayContent.appendChild(makeSliderRow('Opacité ciel', 0, 1, 0.05, 0.8, (v) => skyMap.setSkyOpacity(v)));
+  displayContent.appendChild(makeSliderRow('Fond', 0, 1, 0.05, 1, (v) => skyMap.setBackgroundOpacity(v)));
 
   panel.appendChild(displaySection);
 
@@ -404,19 +424,19 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
 
   dsoSearchWrapper.appendChild(dsoInput);
   dsoSearchWrapper.appendChild(dsoDropdown);
-  dsoSection.appendChild(dsoSearchWrapper);
+  dsoContent.appendChild(dsoSearchWrapper);
 
   // Info panel (shown after selecting a DSO)
   const dsoInfoPanel = document.createElement('div');
   dsoInfoPanel.className = 'dso-info-panel';
   dsoInfoPanel.style.display = 'none';
-  dsoSection.appendChild(dsoInfoPanel);
+  dsoContent.appendChild(dsoInfoPanel);
 
   // Nearby stars panel
   const nearbyPanel = document.createElement('div');
   nearbyPanel.className = 'dso-nearby-panel';
   nearbyPanel.style.display = 'none';
-  dsoSection.appendChild(nearbyPanel);
+  dsoContent.appendChild(nearbyPanel);
 
   panel.appendChild(dsoSection);
 

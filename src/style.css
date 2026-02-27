@@ -53,6 +53,20 @@ html, body {
   image-rendering: auto;
 }
 
+/* ─── Sidebar collapsible sections ─── */
+.sidebar-section { margin-bottom: 4px; }
+.sidebar-section-header {
+  display: flex; align-items: center; justify-content: space-between;
+  cursor: pointer; padding: 8px 0; user-select: none;
+  font-size: 13px; font-weight: 600; color: #99a;
+  text-transform: uppercase; letter-spacing: 0.05em;
+}
+.sidebar-section-header:hover { color: #ccf; }
+.sidebar-section-chevron { transition: transform 0.2s; font-size: 10px; }
+.sidebar-section.collapsed .sidebar-section-chevron { transform: rotate(-90deg); }
+.sidebar-section.collapsed .sidebar-section-content { display: none; }
+.sidebar-section-content { padding-top: 8px; }
+
 /* ─── Side panel ─── */
 #side-panel {
   position: absolute;
