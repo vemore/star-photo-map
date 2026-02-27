@@ -1,4 +1,6 @@
 import express from 'express';
+import helmet from 'helmet';
+import compression from 'compression';
 import multer from 'multer';
 import sharp from 'sharp';
 import { v4 as uuidv4 } from 'uuid';
@@ -44,6 +46,8 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 const app = express();
+app.use(helmet({ contentSecurityPolicy: false }));
+app.use(compression());
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
@@ -52,7 +56,16 @@ const upload = multer({
 // In production, serve the built frontend
 const DIST_DIR = path.join(__dirname, '..', 'dist');
 if (fs.existsSync(DIST_DIR)) {
-  app.use(express.static(DIST_DIR));
+  // Long cache for hashed assets and catalog data, no cache for index.html
+  app.use('/assets', express.static(path.join(DIST_DIR, 'assets'), {
+    maxAge: '1y',
+    immutable: true,
+  }));
+  app.use('/data', express.static(path.join(DIST_DIR, 'data'), {
+    maxAge: '1y',
+    immutable: true,
+  }));
+  app.use(express.static(DIST_DIR, { maxAge: 0 }));
 }
 
 // Serve uploaded files

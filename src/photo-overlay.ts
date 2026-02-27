@@ -262,7 +262,12 @@ export class PhotoOverlay {
   }
 
   async removePhoto(photoId: string) {
-    await deletePhotoAPI(photoId);
+    try {
+      await deletePhotoAPI(photoId);
+    } catch (err: any) {
+      showToast({ message: `Erreur de suppression : ${err.message}`, type: 'error', duration: 5000 });
+      return;
+    }
     const idx = this.placedPhotos.findIndex(p => p.photo.id === photoId);
     if (idx >= 0) {
       this.placedPhotos[idx].imgEl.remove();

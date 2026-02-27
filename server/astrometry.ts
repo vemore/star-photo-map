@@ -19,7 +19,19 @@ interface AstrometryJob {
 
 const API_BASE = 'https://nova.astrometry.net/api';
 const jobs = new Map<string, AstrometryJob>();
+const jobCreatedAt = new Map<string, number>();
+const JOB_TTL_MS = 60 * 60 * 1000; // 1 hour
 let sessionKey: string | null = null;
+
+function evictStaleJobs() {
+  const now = Date.now();
+  for (const [id, createdAt] of jobCreatedAt) {
+    if (now - createdAt > JOB_TTL_MS) {
+      jobs.delete(id);
+      jobCreatedAt.delete(id);
+    }
+  }
+}
 
 async function login(): Promise<string> {
   const apiKey = process.env.ASTROMETRY_API_KEY;
@@ -58,6 +70,8 @@ export async function submitJob(
   const session = await getSession();
   const localId = crypto.randomUUID();
 
+  evictStaleJobs();
+
   const job: AstrometryJob = {
     localId,
     status: 'pending',
@@ -65,6 +79,7 @@ export async function submitJob(
     imageHeight,
   };
   jobs.set(localId, job);
+  jobCreatedAt.set(localId, Date.now());
 
   // Upload via multipart form
   const boundary = '----AstrometryBoundary' + Date.now();
