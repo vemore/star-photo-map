@@ -972,7 +972,7 @@ export class PhotoOverlay {
         this.onPhotosChanged?.();
         backdrop.remove();
       } catch (err: any) {
-        alert(`Erreur : ${err.message}`);
+        showToast({ message: `Erreur : ${err.message}`, type: 'error', duration: 5000 });
         submitBtn.disabled = false;
         submitBtn.textContent = 'Placer sur la carte';
         progressBar.style.display = 'none';
@@ -1137,7 +1137,7 @@ export class PhotoOverlay {
       try {
         const correspondences = buildSyntheticCorrespondences(placement, naturalWidth, naturalHeight);
         if (!correspondences) {
-          alert('Impossible de trouver des étoiles de correspondance. Essayez de repositionner la photo.');
+          showToast({ message: 'Impossible de trouver des étoiles de correspondance. Essayez de repositionner la photo.', type: 'error', duration: 5000 });
           validateBtn.disabled = false;
           validateBtn.textContent = 'Valider';
           return;
@@ -1147,7 +1147,7 @@ export class PhotoOverlay {
         this.addPhotoToMap(photo);
         this.onPhotosChanged?.();
       } catch (err: any) {
-        alert(`Erreur : ${err.message}`);
+        showToast({ message: `Erreur : ${err.message}`, type: 'error', duration: 5000 });
         validateBtn.disabled = false;
         validateBtn.textContent = 'Valider';
       }

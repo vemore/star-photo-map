@@ -44,7 +44,10 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 }
 
 const app = express();
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200 MB
+});
 
 // In production, serve the built frontend
 const DIST_DIR = path.join(__dirname, '..', 'dist');
@@ -107,6 +110,26 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
     if (correspondences.length > MAX_CORRESPONDENCES) {
       res.status(400).json({ error: `Trop de correspondances (max ${MAX_CORRESPONDENCES})` });
       return;
+    }
+
+    // Validate each correspondence field
+    for (const c of correspondences) {
+      if (!Number.isInteger(c.pointIndex) || c.pointIndex < 0 || c.pointIndex > 2) {
+        res.status(400).json({ error: 'pointIndex invalide (entier 0-2 attendu)' });
+        return;
+      }
+      if (typeof c.photoX !== 'number' || !Number.isFinite(c.photoX) || c.photoX < 0) {
+        res.status(400).json({ error: 'photoX invalide (nombre positif attendu)' });
+        return;
+      }
+      if (typeof c.photoY !== 'number' || !Number.isFinite(c.photoY) || c.photoY < 0) {
+        res.status(400).json({ error: 'photoY invalide (nombre positif attendu)' });
+        return;
+      }
+      if (!Number.isInteger(c.starHip) || c.starHip <= 0) {
+        res.status(400).json({ error: 'starHip invalide (entier positif attendu)' });
+        return;
+      }
     }
 
     // Get original dimensions

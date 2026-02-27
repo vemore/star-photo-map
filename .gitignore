@@ -9,3 +9,8 @@ data.db
 .vite/
 .playwright-mcp/
 server/data/
+
+# Debug/test artifacts
+/*.png
+/*.txt
+/test-photos/
