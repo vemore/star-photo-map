@@ -9,6 +9,7 @@ import { createPhoto, getAllPhotos, deletePhoto, getPhotoFilename } from './db.j
 import { extractWCS, wcsToCorrespondences, loadServerCatalog } from './wcs-reader.js';
 import { submitJob, getJobStatus, isConfigured as isAstrometryConfigured } from './astrometry.js';
 import { isASTAPInstalled, solveWithASTAP } from './astap.js';
+import { searchDeepStars, getDeepStarByHip } from './star-search.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
@@ -279,6 +280,36 @@ app.get('/api/solve-plate/:id', (req, res) => {
     correspondences: job.correspondences,
     error: job.error,
   });
+});
+
+// --- Star search API ---
+app.get('/api/stars/search', (req, res) => {
+  try {
+    const q = String(req.query.q || '');
+    const limit = Math.min(Math.max(1, parseInt(String(req.query.limit || '10'), 10) || 10), 50);
+    const results = searchDeepStars(q, limit);
+    res.json(results);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/stars/:hip', (req, res) => {
+  try {
+    const hip = parseInt(req.params.hip, 10);
+    if (isNaN(hip)) {
+      res.status(400).json({ error: 'HIP invalide' });
+      return;
+    }
+    const star = getDeepStarByHip(hip);
+    if (!star) {
+      res.status(404).json({ error: 'Étoile introuvable' });
+      return;
+    }
+    res.json(star);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // SPA fallback in production

@@ -2,8 +2,7 @@ import type { Photo, PhotoCorrespondence, Star, Point, ViewState, ManualPlacemen
 import { project, toCanvas, unproject } from './projection';
 import { computeAffineTransform, computeAffineLSQ, affineToCSS } from './affine';
 import { getStarByHip, getStars } from './star-catalog';
-import { searchStars } from './search';
-import { uploadPhoto, deletePhotoAPI, solveWCS, submitPlateSolve, pollPlateSolve, solveWithASTAP } from './api';
+import { uploadPhoto, deletePhotoAPI, solveWCS, submitPlateSolve, pollPlateSolve, solveWithASTAP, searchStarsAPI } from './api';
 import { detectStarsFromFile } from './star-detector';
 import { solvePlate } from './plate-solver';
 import type { SkyMap } from './sky-map';
@@ -390,28 +389,46 @@ export class PhotoOverlay {
       formSide.appendChild(entry);
       pointEntries.push(entry);
 
-      // Search handler
+      // Search handler (async with debounce)
+      let debounceTimer: ReturnType<typeof setTimeout> | null = null;
       searchInput.addEventListener('input', () => {
-        const results = searchStars(searchInput.value);
-        dropdown.innerHTML = '';
-        if (results.length === 0) {
-          dropdown.style.display = 'none';
-          return;
-        }
-        dropdown.style.display = 'block';
-        for (const result of results) {
-          const item = document.createElement('div');
-          item.className = 'search-item';
-          item.innerHTML = `
-            <span class="search-item-name">${result.label}</span>
-            <span class="search-item-mag">mag ${result.star.mag.toFixed(1)}</span>
-          `;
-          item.addEventListener('click', () => {
-            selectStar(i, result.star, result.label);
+        if (debounceTimer) clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(async () => {
+          const query = searchInput.value;
+          if (!query || query.length < 1) {
+            dropdown.innerHTML = '';
             dropdown.style.display = 'none';
-          });
-          dropdown.appendChild(item);
-        }
+            return;
+          }
+          const results = await searchStarsAPI(query);
+          // Ignore stale results
+          if (searchInput.value !== query) return;
+          dropdown.innerHTML = '';
+          if (results.length === 0) {
+            dropdown.style.display = 'none';
+            return;
+          }
+          dropdown.style.display = 'block';
+          for (const result of results) {
+            const item = document.createElement('div');
+            item.className = 'search-item';
+            item.innerHTML = `
+              <span class="search-item-name">${result.label}</span>
+              <span class="search-item-mag">mag ${result.mag.toFixed(1)}</span>
+            `;
+            item.addEventListener('click', () => {
+              const star: Star = {
+                hip: result.hip, ra: result.ra, dec: result.dec,
+                mag: result.mag, bv: result.bv,
+                name: result.name, bayer: result.bayer, flam: result.flam,
+                constellation: result.constellation, desig: result.desig,
+              };
+              selectStar(i, star, result.label);
+              dropdown.style.display = 'none';
+            });
+            dropdown.appendChild(item);
+          }
+        }, 250);
       });
 
       searchInput.addEventListener('blur', () => {

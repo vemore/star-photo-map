@@ -8,3 +8,4 @@ data.db
 *.db-shm
 .vite/
 .playwright-mcp/
+server/data/

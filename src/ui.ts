@@ -2,6 +2,8 @@ import type { Star, DSO } from './types';
 import { SkyMap } from './sky-map';
 import { PhotoOverlay } from './photo-overlay';
 import { searchDSOs, DSO_TYPE_NAMES } from './search';
+import { searchStarsAPI } from './api';
+import type { StarSearchResult } from './api';
 import { getStars } from './star-catalog';
 
 function angularDistance(ra1: number, dec1: number, ra2: number, dec2: number): number {
@@ -86,6 +88,117 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   }
 
   refreshPhotoList();
+
+  // ─── Star search section ──────────────────────────────────────────────────
+  const starSection = document.createElement('div');
+  starSection.className = 'star-search-section';
+
+  const starTitle = document.createElement('h2');
+  starTitle.textContent = 'Étoiles';
+  starSection.appendChild(starTitle);
+
+  const starSearchWrapper = document.createElement('div');
+  starSearchWrapper.className = 'dso-search-wrapper';
+
+  const starInput = document.createElement('input');
+  starInput.type = 'text';
+  starInput.placeholder = 'Rechercher Vega, \u03B1 Lyr, HIP 91262\u2026';
+  starInput.className = 'star-search-input';
+
+  const starDropdown = document.createElement('div');
+  starDropdown.className = 'search-dropdown';
+
+  starSearchWrapper.appendChild(starInput);
+  starSearchWrapper.appendChild(starDropdown);
+  starSection.appendChild(starSearchWrapper);
+
+  const starInfoPanel = document.createElement('div');
+  starInfoPanel.className = 'dso-info-panel';
+  starInfoPanel.style.display = 'none';
+  starSection.appendChild(starInfoPanel);
+
+  panel.appendChild(starSection);
+
+  function showStarInfo(star: StarSearchResult) {
+    const nameStr = star.name ? `<div class="dso-info-name">${star.name}</div>` : '';
+    const desigStr = star.desig && star.constellation
+      ? `${star.desig} ${star.constellation}`
+      : star.bayer && star.constellation
+        ? `${star.bayer} ${star.constellation}`
+        : '';
+    const flamStr = star.flam && star.constellation ? `${star.flam} ${star.constellation}` : '';
+    const raH = (star.ra / 15);
+    const raHH = Math.floor(raH);
+    const raMM = Math.floor((raH - raHH) * 60);
+    const raSS = ((raH - raHH) * 60 - raMM) * 60;
+    const raStr = `${raHH}h ${raMM}m ${raSS.toFixed(1)}s`;
+    const decSign = star.dec >= 0 ? '+' : '';
+    const decAbs = Math.abs(star.dec);
+    const decDD = Math.floor(decAbs);
+    const decMM = Math.floor((decAbs - decDD) * 60);
+    const decSS = ((decAbs - decDD) * 60 - decMM) * 60;
+    const decStr = `${decSign}${decDD}\u00B0 ${decMM}' ${decSS.toFixed(0)}"`;
+
+    starInfoPanel.innerHTML = `
+      ${nameStr}
+      <table class="dso-info-table">
+        ${desigStr ? `<tr><td>Désignation</td><td>${desigStr}</td></tr>` : ''}
+        ${flamStr ? `<tr><td>Flamsteed</td><td>${flamStr}</td></tr>` : ''}
+        <tr><td>HIP</td><td>${star.hip}</td></tr>
+        <tr><td>Magnitude</td><td>${star.mag.toFixed(2)}</td></tr>
+        ${star.constellation ? `<tr><td>Constellation</td><td>${star.constellation}</td></tr>` : ''}
+        <tr><td>RA</td><td>${raStr}</td></tr>
+        <tr><td>Déc</td><td>${decStr}</td></tr>
+      </table>
+    `;
+    starInfoPanel.style.display = 'block';
+  }
+
+  let starDebounce: ReturnType<typeof setTimeout> | null = null;
+  starInput.addEventListener('input', () => {
+    if (starDebounce) clearTimeout(starDebounce);
+    starDebounce = setTimeout(async () => {
+      const query = starInput.value;
+      if (!query || query.length < 1) {
+        starDropdown.innerHTML = '';
+        starDropdown.style.display = 'none';
+        return;
+      }
+      const results = await searchStarsAPI(query);
+      if (starInput.value !== query) return;
+      starDropdown.innerHTML = '';
+      if (results.length === 0) {
+        starDropdown.style.display = 'none';
+        return;
+      }
+      starDropdown.style.display = 'block';
+      for (const result of results) {
+        const item = document.createElement('div');
+        item.className = 'search-item';
+        item.innerHTML = `
+          <span class="search-item-name">${result.label}</span>
+          <span class="search-item-mag">mag ${result.mag.toFixed(1)}</span>
+        `;
+        item.addEventListener('click', () => {
+          starInput.value = result.label;
+          starDropdown.style.display = 'none';
+          skyMap.navigateTo(result.ra, result.dec, 600);
+          showStarInfo(result);
+        });
+        starDropdown.appendChild(item);
+      }
+    }, 250);
+  });
+
+  starInput.addEventListener('blur', () => {
+    setTimeout(() => { starDropdown.style.display = 'none'; }, 200);
+  });
+
+  starInput.addEventListener('focus', () => {
+    if (starInput.value.length > 0) {
+      starInput.dispatchEvent(new Event('input'));
+    }
+  });
 
   // ─── DSO section ────────────────────────────────────────────────────────────
   const dsoSection = document.createElement('div');

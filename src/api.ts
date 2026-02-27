@@ -1,5 +1,27 @@
 import type { Photo, PhotoCorrespondence, PlateSolveResult, AstrometrySolveStatus } from './types';
 
+export interface StarSearchResult {
+  hip: number;
+  ra: number;
+  dec: number;
+  mag: number;
+  bv: number;
+  name?: string;
+  bayer?: string;
+  flam?: string;
+  constellation?: string;
+  desig?: string;
+  label: string;
+  score: number;
+}
+
+export async function searchStarsAPI(query: string, limit = 10): Promise<StarSearchResult[]> {
+  const params = new URLSearchParams({ q: query, limit: String(limit) });
+  const res = await fetch(`/api/stars/search?${params}`);
+  if (!res.ok) return [];
+  return res.json();
+}
+
 export async function uploadPhoto(
   file: File,
   correspondences: PhotoCorrespondence[],
