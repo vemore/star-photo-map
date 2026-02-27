@@ -665,6 +665,12 @@ html, body {
   accent-color: rgba(80, 100, 200, 0.8);
 }
 
+.dso-type-toggles {
+  font-size: 12px;
+  margin-left: 20px;
+  margin-bottom: 10px;
+}
+
 .dso-search-wrapper {
   position: relative;
   margin-bottom: 10px;

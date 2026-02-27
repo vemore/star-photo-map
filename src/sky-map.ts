@@ -82,6 +82,7 @@ export class SkyMap {
   private showConstellationLines = true;
   private showConstellationNames = true;
   private maxMagOverride: number | null = null;
+  private visibleDSOTypes: Set<string> = new Set(['Gx', 'OC', 'GC', 'EN', 'RN', 'PN', 'SNR', 'DN', '?']);
 
   // Pan state
   private isPanning = false;
@@ -123,6 +124,7 @@ export class SkyMap {
   setShowConstellationLines(show: boolean) { this.showConstellationLines = show; this.render(); }
   setShowConstellationNames(show: boolean) { this.showConstellationNames = show; this.render(); }
   setMaxMag(mag: number | null) { this.maxMagOverride = mag; this.render(); }
+  setVisibleDSOTypes(types: Set<string>) { this.visibleDSOTypes = types; this.render(); }
 
   navigateTo(ra: number, dec: number, targetScale = 600) {
     const p = project(ra, dec);
@@ -286,6 +288,7 @@ export class SkyMap {
     const threshold = 20 / this.view.scale;
 
     for (const dso of dsos) {
+      if (!this.visibleDSOTypes.has(dso.type)) continue;
       if (dso.mag !== null && dso.mag > maxMag) continue;
       const sp = project(dso.ra, dso.dec);
       const dx = sp.x - projPt.x;
@@ -511,6 +514,7 @@ export class SkyMap {
     const maxMag = this.maxMagOverride ?? (6 + Math.log2(view.scale / 200) * 1.5);
 
     for (const dso of dsos) {
+      if (!this.visibleDSOTypes.has(dso.type)) continue;
       if (dso.mag !== null && dso.mag > maxMag) continue;
 
       const p = project(dso.ra, dso.dec);
@@ -710,6 +714,7 @@ export class SkyMap {
     ctx.textBaseline = 'middle';
 
     for (const dso of dsos) {
+      if (!this.visibleDSOTypes.has(dso.type)) continue;
       if (dso.mag !== null && dso.mag > maxMag) continue;
 
       const isMess = dso.id.startsWith('M') && !dso.id.startsWith('M0');

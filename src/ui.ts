@@ -223,13 +223,56 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   const toggleCheck = document.createElement('input');
   toggleCheck.type = 'checkbox';
   toggleCheck.checked = true;
-  toggleCheck.addEventListener('change', () => {
-    skyMap.setShowDSOs(toggleCheck.checked);
-  });
   toggleLabel.appendChild(toggleCheck);
   toggleLabel.append(' Afficher les DSO');
   toggleRow.appendChild(toggleLabel);
   dsoSection.appendChild(toggleRow);
+
+  // DSO type sub-toggles
+  const dsoTypeToggles = document.createElement('div');
+  dsoTypeToggles.className = 'dso-type-toggles';
+  const dsoTypeChecks: HTMLInputElement[] = [];
+
+  const DSO_TYPE_LABELS: Record<string, string> = {
+    'Gx': 'Galaxies',
+    'OC': 'Amas ouverts',
+    'GC': 'Amas globulaires',
+    'EN': 'Nébuleuses en émission',
+    'RN': 'Nébuleuses par réflexion',
+    'PN': 'Nébuleuses planétaires',
+    'SNR': 'Rémanents de supernova',
+    'DN': 'Nébuleuses sombres',
+  };
+
+  for (const [type, label] of Object.entries(DSO_TYPE_LABELS)) {
+    const typeRow = document.createElement('label');
+    typeRow.className = 'dso-toggle-label';
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = true;
+    cb.dataset.dsoType = type;
+    cb.addEventListener('change', () => {
+      const types = new Set<string>();
+      for (const c of dsoTypeChecks) {
+        if (c.checked) types.add(c.dataset.dsoType!);
+      }
+      skyMap.setVisibleDSOTypes(types);
+    });
+    dsoTypeChecks.push(cb);
+    typeRow.appendChild(cb);
+    typeRow.append(` ${label}`);
+    dsoTypeToggles.appendChild(typeRow);
+  }
+
+  dsoSection.appendChild(dsoTypeToggles);
+
+  toggleCheck.addEventListener('change', () => {
+    skyMap.setShowDSOs(toggleCheck.checked);
+    for (const cb of dsoTypeChecks) {
+      cb.disabled = !toggleCheck.checked;
+    }
+    dsoTypeToggles.style.opacity = toggleCheck.checked ? '1' : '0.4';
+  });
 
   // ─── Display controls section ─────────────────────────────────────────────
   const displaySection = document.createElement('div');
