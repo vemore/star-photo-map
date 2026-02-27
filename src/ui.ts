@@ -269,7 +269,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
 
   const magSlider = document.createElement('input');
   magSlider.type = 'range';
-  magSlider.min = '6';
+  magSlider.min = '1';
   magSlider.max = '11';
   magSlider.step = '0.5';
   magSlider.value = '8.5';
