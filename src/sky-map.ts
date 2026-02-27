@@ -97,6 +97,9 @@ export class SkyMap {
   private panStartCenterX = 0;
   private panStartCenterY = 0;
 
+  // Animation
+  private animationId: number | null = null;
+
   // Picking mode
   private pickingMode = false;
   private onStarPicked: StarPickedCallback | null = null;
@@ -153,13 +156,59 @@ export class SkyMap {
 
   getShowGrid() { return this.showGrid; }
 
-  navigateTo(ra: number, dec: number, targetScale = 600) {
-    const p = project(ra, dec);
-    this.view.centerX = p.x;
-    this.view.centerY = p.y;
-    this.view.scale = targetScale;
-    this.render();
-    this.onViewChange?.();
+  private cancelAnimation() {
+    if (this.animationId !== null) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = null;
+    }
+  }
+
+  navigateTo(ra: number, dec: number, targetScale = 600, animate = true) {
+    const target = project(ra, dec);
+
+    if (!animate) {
+      this.cancelAnimation();
+      this.view.centerX = target.x;
+      this.view.centerY = target.y;
+      this.view.scale = targetScale;
+      this.render();
+      this.onViewChange?.();
+      return;
+    }
+
+    this.cancelAnimation();
+
+    const startX = this.view.centerX;
+    const startY = this.view.centerY;
+    const startScale = this.view.scale;
+    const startTime = performance.now();
+    const duration = 500;
+
+    const step = (now: number) => {
+      let t = (now - startTime) / duration;
+      if (t >= 1) {
+        t = 1;
+        this.animationId = null;
+      }
+
+      // easeInOutCubic
+      const ease = t < 0.5
+        ? 4 * t * t * t
+        : 1 - Math.pow(-2 * t + 2, 3) / 2;
+
+      this.view.centerX = startX + (target.x - startX) * ease;
+      this.view.centerY = startY + (target.y - startY) * ease;
+      this.view.scale = startScale + (targetScale - startScale) * ease;
+
+      this.render();
+      this.onViewChange?.();
+
+      if (t < 1) {
+        this.animationId = requestAnimationFrame(step);
+      }
+    };
+
+    this.animationId = requestAnimationFrame(step);
   }
 
   getView(): ViewState {
@@ -223,6 +272,7 @@ export class SkyMap {
     // Zoom with mouse wheel
     this.canvas.addEventListener('wheel', (e) => {
       e.preventDefault();
+      this.cancelAnimation();
       const rect = this.canvas.getBoundingClientRect();
       const mx = e.clientX - rect.left;
       const my = e.clientY - rect.top;
@@ -243,6 +293,7 @@ export class SkyMap {
 
     // Pan with mouse drag
     this.canvas.addEventListener('mousedown', (e) => {
+      this.cancelAnimation();
       if (e.button === 0) {
         this.isPanning = true;
         this.panStartX = e.clientX;
