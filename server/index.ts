@@ -14,6 +14,30 @@ import { searchDeepStars, getDeepStarByHip } from './star-search.js';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
 const MAX_SIZE = 2048;
+const ALLOWED_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.tif', '.tiff', '.fits', '.fit', '.webp']);
+const MAX_CORRESPONDENCES = 100;
+
+// Simple in-memory rate limiter
+const rateLimits = new Map<string, number[]>();
+const RATE_WINDOW_MS = 60_000;
+const UPLOAD_LIMIT = 10;  // uploads per minute
+const API_LIMIT = 120;    // API requests per minute
+
+function checkRateLimit(ip: string, limit: number): boolean {
+  const now = Date.now();
+  let timestamps = rateLimits.get(ip);
+  if (!timestamps) {
+    timestamps = [];
+    rateLimits.set(ip, timestamps);
+  }
+  // Evict old entries
+  while (timestamps.length > 0 && timestamps[0] <= now - RATE_WINDOW_MS) {
+    timestamps.shift();
+  }
+  if (timestamps.length >= limit) return false;
+  timestamps.push(now);
+  return true;
+}
 
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -31,12 +55,35 @@ if (fs.existsSync(DIST_DIR)) {
 // Serve uploaded files
 app.use('/uploads', express.static(UPLOADS_DIR));
 
+// Rate limiting on /api routes
+app.use('/api', (req, res, next) => {
+  const ip = req.ip || req.socket.remoteAddress || 'unknown';
+  if (!checkRateLimit(ip, API_LIMIT)) {
+    res.status(429).json({ error: 'Trop de requêtes, réessayez dans un instant' });
+    return;
+  }
+  next();
+});
+
 // Upload a photo with 3 star correspondences
 app.post('/api/photos', upload.single('photo'), async (req, res) => {
   try {
+    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+    if (!checkRateLimit(ip + ':upload', UPLOAD_LIMIT)) {
+      res.status(429).json({ error: 'Trop d\'uploads, réessayez dans un instant' });
+      return;
+    }
+
     const file = req.file;
     if (!file) {
       res.status(400).json({ error: 'Aucun fichier fourni' });
+      return;
+    }
+
+    // Validate file extension
+    const fileExt = path.extname(file.originalname).toLowerCase();
+    if (!ALLOWED_EXTENSIONS.has(fileExt)) {
+      res.status(400).json({ error: `Extension non autorisée : ${fileExt}` });
       return;
     }
 
@@ -55,6 +102,10 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
     }
     if (!Array.isArray(correspondences) || correspondences.length < 3) {
       res.status(400).json({ error: 'Au moins 3 correspondances requises' });
+      return;
+    }
+    if (correspondences.length > MAX_CORRESPONDENCES) {
+      res.status(400).json({ error: `Trop de correspondances (max ${MAX_CORRESPONDENCES})` });
       return;
     }
 
@@ -81,8 +132,7 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
 
     // Save to disk
     const id = uuidv4();
-    const ext = path.extname(file.originalname) || '.jpg';
-    const filename = `${id}${ext}`;
+    const filename = `${id}${fileExt || '.jpg'}`;
     await resized.toFile(path.join(UPLOADS_DIR, filename));
 
     // Scale correspondences to resized dimensions

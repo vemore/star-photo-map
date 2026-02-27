@@ -192,7 +192,17 @@ export class SkyMap {
     const startY = this.view.centerY;
     const startScale = this.view.scale;
     const startTime = performance.now();
-    const duration = 500;
+
+    // Adaptive duration based on distance and zoom ratio
+    const dx = target.x - startX;
+    const dy = target.y - startY;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+    const viewExtent = Math.max(this.view.width, this.view.height) / startScale;
+    const normalizedDist = Math.min(dist / Math.max(viewExtent, 0.001), 1);
+    const zoomRatio = Math.max(targetScale / startScale, startScale / targetScale);
+    const duration = Math.max(300, Math.min(1200,
+      300 + normalizedDist * 600 + Math.log2(Math.max(1, zoomRatio)) * 200
+    ));
 
     const step = (now: number) => {
       let t = (now - startTime) / duration;

@@ -4,14 +4,24 @@ import { SkyMap } from './sky-map';
 import { PhotoOverlay } from './photo-overlay';
 import { getPhotos } from './api';
 import { setupUI } from './ui';
+import { showToast } from './toast';
 import './style.css';
 
 async function init() {
+  const loadingOverlay = document.getElementById('loading-overlay');
+
   // Load star and DSO catalogs in parallel
-  await Promise.all([loadCatalog(), loadDSOCatalog()]);
+  try {
+    await Promise.all([loadCatalog(), loadDSOCatalog()]);
+  } catch (err: any) {
+    // Show error in loading overlay instead of spinner
+    if (loadingOverlay) {
+      loadingOverlay.innerHTML = `<div class="loading-error">${err.message || 'Erreur de chargement des catalogues'}</div>`;
+    }
+    return;
+  }
 
   // Remove loading overlay
-  const loadingOverlay = document.getElementById('loading-overlay');
   if (loadingOverlay) {
     loadingOverlay.classList.add('fade-out');
     loadingOverlay.addEventListener('transitionend', () => loadingOverlay.remove());
@@ -42,7 +52,7 @@ async function init() {
     const photos = await getPhotos();
     overlay.loadPhotos(photos);
   } catch {
-    console.warn('Impossible de charger les photos depuis le serveur');
+    showToast({ message: 'Impossible de charger les photos depuis le serveur', type: 'error' });
   }
 }
 

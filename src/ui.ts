@@ -5,6 +5,7 @@ import { searchDSOs, DSO_TYPE_NAMES } from './search';
 import { searchStarsAPI } from './api';
 import type { StarSearchResult } from './api';
 import { getStars } from './star-catalog';
+import { showToast } from './toast';
 
 function angularDistance(ra1: number, dec1: number, ra2: number, dec2: number): number {
   const toRad = Math.PI / 180;
@@ -140,10 +141,22 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
       deleteBtn.className = 'btn-icon btn-danger';
       deleteBtn.title = 'Supprimer';
       deleteBtn.textContent = '✕';
-      deleteBtn.addEventListener('click', async () => {
-        if (confirm(`Supprimer « ${placed.photo.originalName} » ?`)) {
-          await overlay.removePhoto(placed.photo.id);
-        }
+      deleteBtn.addEventListener('click', () => {
+        const photoId = placed.photo.id;
+        const photoName = placed.photo.originalName;
+        overlay.hidePhoto(photoId);
+        showToast({
+          message: `« ${photoName} » supprimée`,
+          type: 'undo',
+          duration: 5000,
+          actionLabel: 'Annuler',
+          onAction: () => {
+            overlay.unhidePhoto(photoId);
+          },
+          onExpire: () => {
+            overlay.removePhoto(photoId);
+          },
+        });
       });
 
       controls.appendChild(upBtn);

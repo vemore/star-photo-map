@@ -11,12 +11,20 @@ function normalizeRA(ra: number): number {
   return ra;
 }
 
+async function fetchJSON(url: string): Promise<any> {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error(`Impossible de charger ${url} (${res.status} ${res.statusText})`);
+  }
+  return res.json();
+}
+
 export async function loadCatalog(): Promise<void> {
   const [starsData, linesData, namesData, constData] = await Promise.all([
-    fetch('/data/stars.8.json').then(r => r.json()),
-    fetch('/data/constellations.lines.json').then(r => r.json()),
-    fetch('/data/starnames.json').then(r => r.json()),
-    fetch('/data/constellations.json').then(r => r.json()),
+    fetchJSON('/data/stars.8.json'),
+    fetchJSON('/data/constellations.lines.json'),
+    fetchJSON('/data/starnames.json'),
+    fetchJSON('/data/constellations.json'),
   ]);
 
   // Parse stars

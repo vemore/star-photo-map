@@ -29,6 +29,8 @@ db.exec(`
     star_name TEXT,
     UNIQUE(photo_id, point_index)
   );
+
+  CREATE INDEX IF NOT EXISTS idx_corr_photo_id ON star_correspondences(photo_id);
 `);
 
 const insertPhoto = db.prepare(

@@ -22,25 +22,42 @@ export async function searchStarsAPI(query: string, limit = 10): Promise<StarSea
   return res.json();
 }
 
-export async function uploadPhoto(
+export function uploadPhoto(
   file: File,
   correspondences: PhotoCorrespondence[],
+  onProgress?: (fraction: number) => void,
 ): Promise<Photo> {
-  const formData = new FormData();
-  formData.append('photo', file);
-  formData.append('correspondences', JSON.stringify(correspondences));
+  return new Promise((resolve, reject) => {
+    const formData = new FormData();
+    formData.append('photo', file);
+    formData.append('correspondences', JSON.stringify(correspondences));
 
-  const res = await fetch('/api/photos', {
-    method: 'POST',
-    body: formData,
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/photos');
+
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) {
+          onProgress(e.loaded / e.total);
+        }
+      };
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          resolve(JSON.parse(xhr.responseText));
+        } catch {
+          reject(new Error('Réponse serveur invalide'));
+        }
+      } else {
+        reject(new Error(`Échec de l'upload : ${xhr.responseText}`));
+      }
+    };
+
+    xhr.onerror = () => reject(new Error('Erreur réseau lors de l\'upload'));
+    xhr.send(formData);
   });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Échec de l'upload : ${text}`);
-  }
-
-  return res.json();
 }
 
 export async function getPhotos(): Promise<Photo[]> {

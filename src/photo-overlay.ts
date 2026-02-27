@@ -5,6 +5,7 @@ import { getStarByHip, getStars } from './star-catalog';
 import { uploadPhoto, deletePhotoAPI, solveWCS, submitPlateSolve, pollPlateSolve, solveWithASTAP, searchStarsAPI } from './api';
 import { detectStarsFromFile } from './star-detector';
 import { solvePlate } from './plate-solver';
+import { showToast } from './toast';
 import type { SkyMap } from './sky-map';
 
 const MARKER_COLORS = ['#ff4444', '#44cc44', '#4488ff'];
@@ -14,6 +15,7 @@ interface PlacedPhoto {
   imgEl: HTMLImageElement;
   visible: boolean;
   opacity: number;
+  pendingDelete?: boolean;
 }
 
 function starDisplayLabel(star: Star): string {
@@ -38,6 +40,7 @@ export class PhotoOverlay {
   private getView: () => ViewState;
   private skyMap: SkyMap | null;
   private onPhotosChanged: (() => void) | null = null;
+  private affineErrorShown = new Set<string>();
 
   constructor(container: HTMLDivElement, getView: () => ViewState, skyMap?: SkyMap) {
     this.container = container;
@@ -67,7 +70,7 @@ export class PhotoOverlay {
   }
 
   getPlacedPhotos(): PlacedPhoto[] {
-    return this.placedPhotos;
+    return this.placedPhotos.filter(p => !p.pendingDelete);
   }
 
   /** Compute canvas-space outlines (quadrilaterals) for all visible photos */
@@ -239,6 +242,25 @@ export class PhotoOverlay {
     }
   }
 
+  hidePhoto(photoId: string) {
+    const placed = this.placedPhotos.find(p => p.photo.id === photoId);
+    if (!placed) return;
+    placed.pendingDelete = true;
+    placed.imgEl.style.display = 'none';
+    this.onPhotosChanged?.();
+  }
+
+  unhidePhoto(photoId: string) {
+    const placed = this.placedPhotos.find(p => p.photo.id === photoId);
+    if (!placed) return;
+    placed.pendingDelete = false;
+    placed.imgEl.style.display = placed.visible ? 'block' : 'none';
+    if (placed.visible) {
+      this.applyTransform(placed, this.getView());
+    }
+    this.onPhotosChanged?.();
+  }
+
   async removePhoto(photoId: string) {
     await deletePhotoAPI(photoId);
     const idx = this.placedPhotos.findIndex(p => p.photo.id === photoId);
@@ -302,8 +324,11 @@ export class PhotoOverlay {
         : computeAffineLSQ(photoPoints, canvasPoints);
       imgEl.style.transform = affineToCSS(matrix);
     } catch {
-      // Points colinear - hide
       imgEl.style.display = 'none';
+      if (!this.affineErrorShown.has(photo.id)) {
+        this.affineErrorShown.add(photo.id);
+        showToast({ message: `Erreur de placement : ${photo.originalName}`, type: 'error', duration: 5000 });
+      }
     }
   }
 
@@ -602,6 +627,15 @@ export class PhotoOverlay {
         }
       });
     }
+
+    // Upload progress bar
+    const progressBar = document.createElement('div');
+    progressBar.className = 'upload-progress';
+    progressBar.style.display = 'none';
+    const progressFill = document.createElement('div');
+    progressFill.className = 'upload-progress-fill';
+    progressBar.appendChild(progressFill);
+    formSide.appendChild(progressBar);
 
     // Submit button
     const submitBtn = document.createElement('button');
@@ -923,13 +957,17 @@ export class PhotoOverlay {
     submitBtn.addEventListener('click', async () => {
       submitBtn.disabled = true;
       submitBtn.textContent = 'Envoi en cours...';
+      progressBar.style.display = 'block';
+      progressFill.style.width = '0%';
 
       try {
         const correspondences = [
           ...(points.filter(Boolean) as PhotoCorrespondence[]),
           ...extraAutoCorrespondences,
         ];
-        const photo = await uploadPhoto(file, correspondences);
+        const photo = await uploadPhoto(file, correspondences, (fraction) => {
+          progressFill.style.width = `${Math.round(fraction * 100)}%`;
+        });
         this.addPhotoToMap(photo);
         this.onPhotosChanged?.();
         backdrop.remove();
@@ -937,6 +975,7 @@ export class PhotoOverlay {
         alert(`Erreur : ${err.message}`);
         submitBtn.disabled = false;
         submitBtn.textContent = 'Placer sur la carte';
+        progressBar.style.display = 'none';
       }
     });
   }

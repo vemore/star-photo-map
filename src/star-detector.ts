@@ -37,15 +37,17 @@ export function detectStars(
     subtracted[i] = Math.max(0, gray[i] - background[i]);
   }
 
-  // 4. Adaptive threshold: mean + 3*sigma of subtracted
-  let sum = 0;
-  let sumSq = 0;
-  for (let i = 0; i < w * h; i++) {
-    sum += subtracted[i];
-    sumSq += subtracted[i] * subtracted[i];
+  // 4. Adaptive threshold: mean + 3*sigma of subtracted (Welford's algorithm)
+  let wMean = 0;
+  let wM2 = 0;
+  const totalPixels = w * h;
+  for (let i = 0; i < totalPixels; i++) {
+    const delta = subtracted[i] - wMean;
+    wMean += delta / (i + 1);
+    wM2 += delta * (subtracted[i] - wMean);
   }
-  const mean = sum / (w * h);
-  const variance = sumSq / (w * h) - mean * mean;
+  const mean = wMean;
+  const variance = totalPixels > 1 ? wM2 / totalPixels : 0;
   const sigma = Math.sqrt(Math.max(0, variance));
   const threshold = mean + 3 * sigma;
 
@@ -173,6 +175,9 @@ export function detectStarsFromFile(file: File): Promise<StarDetectionResult> {
       ctx.drawImage(img, 0, 0, w, h);
 
       const imageData = ctx.getImageData(0, 0, w, h);
+      // Free GPU-backed canvas memory before heavy CPU work
+      canvas.width = 0;
+      canvas.height = 0;
       resolve(detectStars(imageData, origWidth, origHeight));
     };
 

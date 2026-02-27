@@ -21,7 +21,12 @@ export function computeAffineTransform(
     p0.y * (p1.x - p2.x) +
     (p1.x * p2.y - p2.x * p1.y);
 
-  if (Math.abs(det) < 1e-10) {
+  // Relative singularity threshold based on input coordinate scale
+  const scale = Math.max(
+    Math.abs(p0.x), Math.abs(p0.y), Math.abs(p1.x), Math.abs(p1.y),
+    Math.abs(p2.x), Math.abs(p2.y), 1,
+  );
+  if (Math.abs(det) < 1e-10 * scale * scale) {
     throw new Error('Les points sont colinéaires');
   }
 
@@ -48,6 +53,10 @@ export function computeAffineTransform(
   const b = inv[0][0] * c0.y + inv[0][1] * c1.y + inv[0][2] * c2.y;
   const d = inv[1][0] * c0.y + inv[1][1] * c1.y + inv[1][2] * c2.y;
   const f = inv[2][0] * c0.y + inv[2][1] * c1.y + inv[2][2] * c2.y;
+
+  if (!isFinite(a) || !isFinite(b) || !isFinite(c) || !isFinite(d) || !isFinite(e) || !isFinite(f)) {
+    throw new Error('Transformation affine invalide');
+  }
 
   return { a, b, c, d, e, f };
 }
@@ -100,7 +109,11 @@ export function computeAffineLSQ(
     m01 * (m10 * m22 - m12 * m20) +
     m02 * (m10 * m21 - m11 * m20);
 
-  if (Math.abs(det) < 1e-6) throw new Error('Points colinéaires');
+  // Relative singularity threshold based on normal matrix scale
+  const mScale = Math.max(Math.abs(m00), Math.abs(m11), m22, 1);
+  if (Math.abs(det) < 1e-10 * mScale * mScale * mScale) {
+    throw new Error('Points colinéaires');
+  }
 
   // Solve M·x = rhs via Cramer's rule
   function cramer(r0: number, r1: number, r2: number): [number, number, number] {
@@ -112,5 +125,10 @@ export function computeAffineLSQ(
 
   const [a, c, e] = cramer(s_xX, s_yX, s_X);
   const [b, d, f] = cramer(s_xY, s_yY, s_Y);
+
+  if (!isFinite(a) || !isFinite(b) || !isFinite(c) || !isFinite(d) || !isFinite(e) || !isFinite(f)) {
+    throw new Error('Transformation affine invalide');
+  }
+
   return { a, b, c, d, e, f };
 }
