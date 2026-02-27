@@ -298,6 +298,7 @@ export class SkyMap {
     for (const dso of dsos) {
       if (!this.visibleDSOTypes.has(dso.type)) continue;
       if (dso.mag !== null && dso.mag > maxMag) continue;
+      if (dso.mag === null && this.maxMagOverride !== null) continue;
       const sp = project(dso.ra, dso.dec);
       const dx = sp.x - projPt.x;
       const dy = sp.y - projPt.y;
@@ -537,6 +538,7 @@ export class SkyMap {
     for (const dso of dsos) {
       if (!this.visibleDSOTypes.has(dso.type)) continue;
       if (dso.mag !== null && dso.mag > maxMag) continue;
+      if (dso.mag === null && this.maxMagOverride !== null) continue;
 
       const p = project(dso.ra, dso.dec);
       const c = toCanvas(p.x, p.y, view);
@@ -737,6 +739,7 @@ export class SkyMap {
     for (const dso of dsos) {
       if (!this.visibleDSOTypes.has(dso.type)) continue;
       if (dso.mag !== null && dso.mag > maxMag) continue;
+      if (dso.mag === null && this.maxMagOverride !== null) continue;
 
       const isMess = dso.id.startsWith('M') && !dso.id.startsWith('M0');
       const majorArcmin = dso.majAxis ?? 1;
