@@ -18,8 +18,11 @@ async function init() {
   const overlayDiv = document.getElementById('photo-layer') as HTMLDivElement;
   const overlay = new PhotoOverlay(overlayDiv, () => skyMap.getView(), skyMap);
 
-  // Update photo transforms when map view changes
-  skyMap.setOnViewChange(() => overlay.updateTransforms());
+  // Update photo transforms and outlines when map view changes
+  skyMap.setOnViewChange(() => {
+    overlay.updateTransforms();
+    skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));
+  });
 
   // Resize handler
   window.addEventListener('resize', () => skyMap.resize());

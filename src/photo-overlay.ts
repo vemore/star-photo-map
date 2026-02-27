@@ -70,6 +70,56 @@ export class PhotoOverlay {
     return this.placedPhotos;
   }
 
+  /** Compute canvas-space outlines (quadrilaterals) for all visible photos */
+  getPhotoCanvasOutlines(view: ViewState): { name: string; corners: Point[] }[] {
+    const results: { name: string; corners: Point[] }[] = [];
+
+    for (const placed of this.placedPhotos) {
+      if (!placed.visible || placed.photo.correspondences.length < 3) continue;
+
+      const photoPoints: Point[] = [];
+      const canvasPoints: Point[] = [];
+
+      for (const corr of placed.photo.correspondences) {
+        const star = getStarByHip(corr.starHip);
+        if (!star) continue;
+        const proj = project(star.ra, star.dec);
+        const canvasPt = toCanvas(proj.x, proj.y, view);
+        photoPoints.push({ x: corr.photoX, y: corr.photoY });
+        canvasPoints.push(canvasPt);
+      }
+
+      if (photoPoints.length < 3) continue;
+
+      try {
+        const matrix = photoPoints.length === 3
+          ? computeAffineTransform(photoPoints as [Point, Point, Point], canvasPoints as [Point, Point, Point])
+          : computeAffineLSQ(photoPoints, canvasPoints);
+
+        const w = placed.imgEl.naturalWidth || placed.photo.width;
+        const h = placed.imgEl.naturalHeight || placed.photo.height;
+
+        const photoCorners = [
+          { x: 0, y: 0 },
+          { x: w, y: 0 },
+          { x: w, y: h },
+          { x: 0, y: h },
+        ];
+
+        const corners = photoCorners.map(p => ({
+          x: matrix.a * p.x + matrix.c * p.y + matrix.e,
+          y: matrix.b * p.x + matrix.d * p.y + matrix.f,
+        }));
+
+        results.push({ name: placed.photo.originalName, corners });
+      } catch {
+        // colinear points - skip
+      }
+    }
+
+    return results;
+  }
+
   /** Compute the average RA/Dec center of a photo from its star correspondences */
   getPhotoCenter(photoId: string): { ra: number; dec: number } | null {
     const placed = this.placedPhotos.find(p => p.photo.id === photoId);

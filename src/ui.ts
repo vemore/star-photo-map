@@ -69,8 +69,12 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
     overlay.openRegistrationModal();
   });
 
-  // Refresh photo list when photos change
-  overlay.setOnPhotosChanged(() => refreshPhotoList());
+  // Refresh photo list and outlines when photos change
+  overlay.setOnPhotosChanged(() => {
+    refreshPhotoList();
+    skyMap.setPhotoOutlines(overlay.getPhotoCanvasOutlines(skyMap.getView()));
+    skyMap.render();
+  });
 
   function refreshPhotoList() {
     photoList.innerHTML = '';
@@ -359,6 +363,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   displayContent.appendChild(makeCheckRow('Noms des constellations', true, (v) => skyMap.setShowConstellationNames(v)));
   displayContent.appendChild(makeCheckRow('Noms des étoiles', true, (v) => skyMap.setShowStarLabels(v)));
   displayContent.appendChild(makeCheckRow('Grille RA/Déc', true, (v) => skyMap.setShowGrid(v)));
+  displayContent.appendChild(makeCheckRow('Cadres des photos', true, (v) => skyMap.setShowPhotoOutlines(v)));
 
   // Magnitude slider
   const magRow = document.createElement('div');

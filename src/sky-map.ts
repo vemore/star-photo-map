@@ -87,6 +87,8 @@ export class SkyMap {
   private showStarLabels = true;
   private skyOpacity = 0.8;
   private backgroundOpacity = 1.0;
+  private photoOutlines: { name: string; corners: Point[] }[] = [];
+  private showPhotoOutlines = true;
 
   // Pan state
   private isPanning = false;
@@ -133,6 +135,8 @@ export class SkyMap {
   setShowStarLabels(show: boolean) { this.showStarLabels = show; this.render(); }
   setSkyOpacity(v: number) { this.skyOpacity = v; this.render(); }
   setBackgroundOpacity(v: number) { this.backgroundOpacity = v; this.render(); }
+  setPhotoOutlines(outlines: { name: string; corners: Point[] }[]) { this.photoOutlines = outlines; }
+  setShowPhotoOutlines(show: boolean) { this.showPhotoOutlines = show; this.render(); }
 
   navigateTo(ra: number, dec: number, targetScale = 600) {
     const p = project(ra, dec);
@@ -359,6 +363,40 @@ export class SkyMap {
     }
 
     ctx.restore();
+
+    if (this.showPhotoOutlines && this.photoOutlines.length > 0) {
+      this.renderPhotoOutlines();
+    }
+  }
+
+  private renderPhotoOutlines() {
+    const { ctx } = this;
+
+    for (const outline of this.photoOutlines) {
+      const { corners, name } = outline;
+      if (corners.length < 4) continue;
+
+      ctx.save();
+      ctx.strokeStyle = 'rgba(100, 150, 255, 0.5)';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+
+      ctx.beginPath();
+      ctx.moveTo(corners[0].x, corners[0].y);
+      for (let i = 1; i < corners.length; i++) {
+        ctx.lineTo(corners[i].x, corners[i].y);
+      }
+      ctx.closePath();
+      ctx.stroke();
+
+      // Label above top-left corner
+      ctx.setLineDash([]);
+      ctx.font = '10px sans-serif';
+      ctx.fillStyle = 'rgba(100, 150, 255, 0.7)';
+      ctx.fillText(name, corners[0].x, corners[0].y - 4);
+
+      ctx.restore();
+    }
   }
 
   private renderBackground() {
