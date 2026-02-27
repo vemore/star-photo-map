@@ -109,18 +109,18 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
       controls.className = 'photo-item-controls';
 
       const upBtn = document.createElement('button');
-      upBtn.className = 'btn-icon';
+      upBtn.className = 'btn-icon btn-zorder';
       upBtn.title = 'Mettre devant';
-      upBtn.textContent = '▲';
+      upBtn.textContent = '↑';
       upBtn.disabled = i >= photos.length - 1;
       upBtn.addEventListener('click', () => {
         overlay.movePhotoUp(placed.photo.id);
       });
 
       const downBtn = document.createElement('button');
-      downBtn.className = 'btn-icon';
+      downBtn.className = 'btn-icon btn-zorder';
       downBtn.title = 'Mettre derrière';
-      downBtn.textContent = '▼';
+      downBtn.textContent = '↓';
       downBtn.disabled = i <= 0;
       downBtn.addEventListener('click', () => {
         overlay.movePhotoDown(placed.photo.id);
