@@ -1,4 +1,5 @@
 import type { DSO, DSOType } from './types';
+import { getLang } from './i18n';
 
 let dsos: DSO[] = [];
 const dsoById = new Map<string, DSO>();
@@ -25,8 +26,15 @@ export async function loadDSOCatalog(): Promise<void> {
   const idxPa       = fields.indexOf('pa');
   const idxMag      = fields.indexOf('mag');
   const idxNameFr   = fields.indexOf('nameFr');
+  const idxNameEn   = fields.indexOf('nameEn');
+
+  const lang = getLang();
 
   for (const row of json.data) {
+    const nameFr: string | null = row[idxNameFr];
+    const nameEn: string | null = idxNameEn >= 0 ? row[idxNameEn] : null;
+    const displayName = lang === 'fr' ? nameFr : (nameEn || nameFr);
+
     const dso: DSO = {
       id:      row[idxId],
       ra:      row[idxRa],
@@ -36,7 +44,7 @@ export async function loadDSOCatalog(): Promise<void> {
       minAxis: row[idxMinAxis],
       pa:      row[idxPa] ?? 0,
       mag:     row[idxMag],
-      nameFr:  row[idxNameFr],
+      displayName,
     };
     dsos.push(dso);
 

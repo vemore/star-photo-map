@@ -59,6 +59,26 @@ html, body {
   accent-color: rgba(80, 100, 200, 0.8);
 }
 
+/* ─── Language selector ─── */
+.lang-selector {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+  justify-content: flex-end;
+}
+.lang-btn {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: #99a;
+  padding: 2px 8px;
+  font-size: 11px;
+  cursor: pointer;
+  border-radius: 3px;
+  font-weight: 400;
+}
+.lang-btn:hover { color: #ccf; border-color: rgba(255,255,255,0.4); }
+.lang-btn.active { color: #fff; font-weight: 700; border-color: rgba(100,120,220,0.7); background: rgba(100,120,220,0.2); }
+
 /* ─── Sidebar collapsible sections ─── */
 .sidebar-section { margin-bottom: 4px; }
 .sidebar-section-header {
@@ -422,6 +442,27 @@ html, body {
 .btn-pick-map:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+}
+
+.radec-row {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.radec-input {
+  width: 90px;
+  padding: 5px 6px;
+  background: rgba(20, 20, 50, 0.7);
+  border: 1px solid rgba(80, 80, 140, 0.4);
+  border-radius: 4px;
+  color: #ccd;
+  font-size: 12px;
+}
+
+.radec-input:focus {
+  border-color: rgba(100, 100, 200, 0.6);
+  outline: none;
 }
 
 .star-search-input {
@@ -833,6 +874,27 @@ html, body {
   min-width: 32px;
   text-align: right;
   font-size: 11px;
+}
+
+.manual-mirror-btn {
+  padding: 5px 12px;
+  background: rgba(40, 40, 80, 0.6);
+  border: 1px solid rgba(80, 80, 140, 0.4);
+  border-radius: 4px;
+  color: #bbc;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background 0.2s, border-color 0.2s;
+}
+
+.manual-mirror-btn:hover {
+  background: rgba(60, 60, 120, 0.7);
+}
+
+.manual-mirror-btn.active {
+  background: rgba(60, 100, 160, 0.7);
+  border-color: rgba(80, 140, 220, 0.6);
+  color: #ddf;
 }
 
 .manual-toolbar-buttons {

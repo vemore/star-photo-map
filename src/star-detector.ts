@@ -1,4 +1,5 @@
 import type { DetectedSpot, StarDetectionResult } from './types';
+import { t } from './i18n';
 
 const TARGET_WIDTH = 1000;
 
@@ -183,7 +184,7 @@ export function detectStarsFromFile(file: File): Promise<StarDetectionResult> {
 
     img.onerror = () => {
       URL.revokeObjectURL(url);
-      reject(new Error('Impossible de charger l\'image'));
+      reject(new Error(t('errors.imageLoadFailed')));
     };
 
     img.src = url;

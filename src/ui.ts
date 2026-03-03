@@ -1,11 +1,12 @@
 import type { Star, DSO } from './types';
 import { SkyMap } from './sky-map';
 import { PhotoOverlay } from './photo-overlay';
-import { searchDSOs, DSO_TYPE_NAMES } from './search';
+import { searchDSOs, getDSOTypeName } from './search';
 import { searchStarsAPI } from './api';
 import type { StarSearchResult } from './api';
 import { getStars } from './star-catalog';
 import { showToast } from './toast';
+import { t, getLang, setLang } from './i18n';
 
 function angularDistance(ra1: number, dec1: number, ra2: number, dec2: number): number {
   const toRad = Math.PI / 180;
@@ -60,8 +61,27 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   const photoList = document.getElementById('photo-list')!;
   const addBtn = document.getElementById('add-photo-btn')!;
 
+  // ─── Language selector ──────────────────────────────────────────────────────
+  const langSelector = document.createElement('div');
+  langSelector.className = 'lang-selector';
+  const currentLang = getLang();
+
+  for (const lang of ['FR', 'EN'] as const) {
+    const btn = document.createElement('button');
+    btn.className = 'lang-btn';
+    btn.textContent = lang;
+    if (lang.toLowerCase() === currentLang) {
+      btn.classList.add('active');
+    }
+    btn.addEventListener('click', () => {
+      setLang(lang.toLowerCase() as 'fr' | 'en');
+    });
+    langSelector.appendChild(btn);
+  }
+  panel.appendChild(langSelector);
+
   // ─── Photos section (collapsible, open by default) ─────────────────────
-  const { section: photoSection, content: photoContent } = makeSection('Photos', true);
+  const { section: photoSection, content: photoContent } = makeSection(t('photos.section'), true);
   photoContent.appendChild(addBtn);
   photoContent.appendChild(photoList);
   panel.appendChild(photoSection);
@@ -84,7 +104,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
     if (photos.length === 0) {
       const empty = document.createElement('p');
       empty.className = 'empty-list';
-      empty.textContent = 'Aucune photo ajoutée';
+      empty.textContent = t('photos.empty');
       photoList.appendChild(empty);
       return;
     }
@@ -112,7 +132,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
 
       const upBtn = document.createElement('button');
       upBtn.className = 'btn-icon btn-zorder';
-      upBtn.title = 'Mettre devant';
+      upBtn.title = t('photos.moveUp');
       upBtn.textContent = '↑';
       upBtn.disabled = i >= photos.length - 1;
       upBtn.addEventListener('click', () => {
@@ -121,7 +141,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
 
       const downBtn = document.createElement('button');
       downBtn.className = 'btn-icon btn-zorder';
-      downBtn.title = 'Mettre derrière';
+      downBtn.title = t('photos.moveDown');
       downBtn.textContent = '↓';
       downBtn.disabled = i <= 0;
       downBtn.addEventListener('click', () => {
@@ -130,7 +150,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
 
       const toggleBtn = document.createElement('button');
       toggleBtn.className = 'btn-icon';
-      toggleBtn.title = placed.visible ? 'Masquer' : 'Afficher';
+      toggleBtn.title = placed.visible ? t('photos.hide') : t('photos.show');
       toggleBtn.textContent = placed.visible ? '👁' : '👁‍🗨';
       toggleBtn.addEventListener('click', () => {
         overlay.toggleVisibility(placed.photo.id);
@@ -139,17 +159,17 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
 
       const deleteBtn = document.createElement('button');
       deleteBtn.className = 'btn-icon btn-danger';
-      deleteBtn.title = 'Supprimer';
+      deleteBtn.title = t('photos.delete');
       deleteBtn.textContent = '✕';
       deleteBtn.addEventListener('click', () => {
         const photoId = placed.photo.id;
         const photoName = placed.photo.originalName;
         overlay.hidePhoto(photoId);
         showToast({
-          message: `« ${photoName} » supprimée`,
+          message: t('photos.deleted', { name: photoName }),
           type: 'undo',
           duration: 5000,
-          actionLabel: 'Annuler',
+          actionLabel: t('photos.undo'),
           onAction: () => {
             overlay.unhidePhoto(photoId);
           },
@@ -190,14 +210,14 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   refreshPhotoList();
 
   // ─── Star search section (collapsible, closed by default) ─────────────────
-  const { section: starSection, content: starContent } = makeSection('Étoiles', false);
+  const { section: starSection, content: starContent } = makeSection(t('stars.section'), false);
 
   const starSearchWrapper = document.createElement('div');
   starSearchWrapper.className = 'dso-search-wrapper';
 
   const starInput = document.createElement('input');
   starInput.type = 'text';
-  starInput.placeholder = 'Rechercher Vega, \u03B1 Lyr, HIP 91262\u2026';
+  starInput.placeholder = t('stars.searchPlaceholder');
   starInput.className = 'star-search-input';
 
   const starDropdown = document.createElement('div');
@@ -237,13 +257,13 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
     starInfoPanel.innerHTML = `
       ${nameStr}
       <table class="dso-info-table">
-        ${desigStr ? `<tr><td>Désignation</td><td>${desigStr}</td></tr>` : ''}
+        ${desigStr ? `<tr><td>${t('stars.designation')}</td><td>${desigStr}</td></tr>` : ''}
         ${flamStr ? `<tr><td>Flamsteed</td><td>${flamStr}</td></tr>` : ''}
         <tr><td>HIP</td><td>${star.hip}</td></tr>
-        <tr><td>Magnitude</td><td>${star.mag.toFixed(2)}</td></tr>
-        ${star.constellation ? `<tr><td>Constellation</td><td>${star.constellation}</td></tr>` : ''}
+        <tr><td>${t('stars.magnitude')}</td><td>${star.mag.toFixed(2)}</td></tr>
+        ${star.constellation ? `<tr><td>${t('stars.constellation')}</td><td>${star.constellation}</td></tr>` : ''}
         <tr><td>RA</td><td>${raStr}</td></tr>
-        <tr><td>Déc</td><td>${decStr}</td></tr>
+        <tr><td>${t('stars.dec')}</td><td>${decStr}</td></tr>
       </table>
     `;
     starInfoPanel.style.display = 'block';
@@ -296,7 +316,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   });
 
   // ─── DSO section (collapsible, closed by default) ──────────────────────────
-  const { section: dsoSection, content: dsoContent } = makeSection('Objets du ciel profond', false);
+  const { section: dsoSection, content: dsoContent } = makeSection(t('dso.section'), false);
 
   // Toggle checkbox
   const toggleRow = document.createElement('div');
@@ -307,7 +327,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   toggleCheck.type = 'checkbox';
   toggleCheck.checked = true;
   toggleLabel.appendChild(toggleCheck);
-  toggleLabel.append(' Afficher les DSO');
+  toggleLabel.append(` ${t('dso.showDSOs')}`);
   toggleRow.appendChild(toggleLabel);
   dsoContent.appendChild(toggleRow);
 
@@ -316,18 +336,10 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   dsoTypeToggles.className = 'dso-type-toggles';
   const dsoTypeChecks: HTMLInputElement[] = [];
 
-  const DSO_TYPE_LABELS: Record<string, string> = {
-    'Gx': 'Galaxies',
-    'OC': 'Amas ouverts',
-    'GC': 'Amas globulaires',
-    'EN': 'Nébuleuses en émission',
-    'RN': 'Nébuleuses par réflexion',
-    'PN': 'Nébuleuses planétaires',
-    'SNR': 'Rémanents de supernova',
-    'DN': 'Nébuleuses sombres',
-  };
+  const DSO_TYPES = ['Gx', 'OC', 'GC', 'EN', 'RN', 'PN', 'SNR', 'DN'];
 
-  for (const [type, label] of Object.entries(DSO_TYPE_LABELS)) {
+  for (const type of DSO_TYPES) {
+    const label = t(`dso.typeLabels.${type}`);
     const typeRow = document.createElement('label');
     typeRow.className = 'dso-toggle-label';
     const cb = document.createElement('input');
@@ -358,7 +370,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   });
 
   // ─── Display controls section (collapsible, open by default) ─────────────
-  const { section: displaySection, content: displayContent } = makeSection('Affichage', true);
+  const { section: displaySection, content: displayContent } = makeSection(t('display.section'), true);
 
   function makeCheckRow(label: string, checked: boolean, onChange: (v: boolean) => void): HTMLElement & { checkbox: HTMLInputElement } {
     const row = document.createElement('label');
@@ -373,17 +385,15 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
     return row as unknown as HTMLElement & { checkbox: HTMLInputElement };
   }
 
-  displayContent.appendChild(makeCheckRow('Afficher les étoiles', true, (v) => {
+  displayContent.appendChild(makeCheckRow(t('display.showStars'), true, (v) => {
     skyMap.setShowStars(v);
-    magRow.style.opacity = v ? '1' : '0.4';
-    magSlider.disabled = !v;
   }));
-  displayContent.appendChild(makeCheckRow('Traits des constellations', true, (v) => skyMap.setShowConstellationLines(v)));
-  displayContent.appendChild(makeCheckRow('Noms des constellations', true, (v) => skyMap.setShowConstellationNames(v)));
-  displayContent.appendChild(makeCheckRow('Noms des étoiles', true, (v) => skyMap.setShowStarLabels(v)));
-  const gridRow = makeCheckRow('Grille RA/Déc', true, (v) => skyMap.setShowGrid(v));
+  displayContent.appendChild(makeCheckRow(t('display.constellationLines'), true, (v) => skyMap.setShowConstellationLines(v)));
+  displayContent.appendChild(makeCheckRow(t('display.constellationNames'), true, (v) => skyMap.setShowConstellationNames(v)));
+  displayContent.appendChild(makeCheckRow(t('display.starLabels'), true, (v) => skyMap.setShowStarLabels(v)));
+  const gridRow = makeCheckRow(t('display.raDecGrid'), true, (v) => skyMap.setShowGrid(v));
   displayContent.appendChild(gridRow);
-  displayContent.appendChild(makeCheckRow('Cadres des photos', true, (v) => skyMap.setShowPhotoOutlines(v)));
+  displayContent.appendChild(makeCheckRow(t('display.photoOutlines'), true, (v) => skyMap.setShowPhotoOutlines(v)));
 
   // Magnitude slider
   const magRow = document.createElement('div');
@@ -410,7 +420,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
     skyMap.setMaxMag(v);
   });
 
-  magLabelEl.append('Magnitude max ');
+  magLabelEl.append(`${t('display.maxMagnitude')} `);
   magRow.appendChild(magLabelEl);
   magRow.appendChild(magSlider);
   magRow.appendChild(magValue);
@@ -444,8 +454,8 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
     return row;
   }
 
-  displayContent.appendChild(makeSliderRow('Opacité ciel', 0, 1, 0.05, 0.8, (v) => skyMap.setSkyOpacity(v)));
-  displayContent.appendChild(makeSliderRow('Gradient de fond', 0, 1, 0.05, 1, (v) => skyMap.setBackgroundOpacity(v)));
+  displayContent.appendChild(makeSliderRow(t('display.skyOpacity'), 0, 1, 0.05, 0.8, (v) => skyMap.setSkyOpacity(v)));
+  displayContent.appendChild(makeSliderRow(t('display.backgroundGradient'), 0, 1, 0.05, 1, (v) => skyMap.setBackgroundOpacity(v)));
 
   panel.appendChild(displaySection);
 
@@ -455,7 +465,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
 
   const dsoInput = document.createElement('input');
   dsoInput.type = 'text';
-  dsoInput.placeholder = 'Rechercher M31, NGC 7000…';
+  dsoInput.placeholder = t('dso.searchPlaceholder');
   dsoInput.className = 'star-search-input';
 
   const dsoDropdown = document.createElement('div');
@@ -480,18 +490,18 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   panel.appendChild(dsoSection);
 
   function showDSOInfo(dso: DSO) {
-    const typeName = DSO_TYPE_NAMES[dso.type] || 'Objet';
+    const typeName = getDSOTypeName(dso.type);
     const magStr = dso.mag !== null ? dso.mag.toFixed(1) : '—';
     const sizeStr = formatSize(dso.majAxis, dso.minAxis);
-    const nameStr = dso.nameFr ? `<div class="dso-info-name">${dso.nameFr}</div>` : '';
+    const nameStr = dso.displayName ? `<div class="dso-info-name">${dso.displayName}</div>` : '';
 
     dsoInfoPanel.innerHTML = `
       ${nameStr}
       <table class="dso-info-table">
-        <tr><td>Type</td><td>${typeName}</td></tr>
-        <tr><td>Magnitude</td><td>${magStr}</td></tr>
-        <tr><td>Taille</td><td>${sizeStr}</td></tr>
-        <tr><td>RA / Déc</td><td>${dso.ra.toFixed(2)}° / ${dso.dec.toFixed(2)}°</td></tr>
+        <tr><td>${t('dso.type')}</td><td>${typeName}</td></tr>
+        <tr><td>${t('stars.magnitude')}</td><td>${magStr}</td></tr>
+        <tr><td>${t('dso.size')}</td><td>${sizeStr}</td></tr>
+        <tr><td>${t('dso.raDec')}</td><td>${dso.ra.toFixed(2)}° / ${dso.dec.toFixed(2)}°</td></tr>
       </table>
     `;
     dsoInfoPanel.style.display = 'block';
@@ -504,7 +514,7 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
       .slice(0, 5);
 
     if (nearby.length > 0) {
-      nearbyPanel.innerHTML = '<div class="dso-nearby-title">Étoiles proches (&lt; 5°)</div>';
+      nearbyPanel.innerHTML = `<div class="dso-nearby-title">${t('stars.nearbyTitle')}</div>`;
       for (const star of nearby) {
         const starEl = document.createElement('div');
         starEl.className = 'dso-nearby-star';
@@ -570,9 +580,9 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
         lines.push(`${star.bayer} ${star.constellation}`);
       }
       lines.push(`HIP ${star.hip}`);
-      lines.push(`Magnitude : ${star.mag.toFixed(2)}`);
+      lines.push(`${t('stars.magnitude')} : ${star.mag.toFixed(2)}`);
       if (star.constellation) {
-        lines.push(`Constellation : ${star.constellation}`);
+        lines.push(`${t('stars.constellation')} : ${star.constellation}`);
       }
       tooltip.innerHTML = lines.join('<br>');
       tooltip.style.left = `${x + 15}px`;
@@ -586,14 +596,14 @@ export function setupUI(skyMap: SkyMap, overlay: PhotoOverlay) {
   // DSO tooltip
   skyMap.setOnDSOHover((dso: DSO | null, x: number, y: number) => {
     if (dso) {
-      const typeName = DSO_TYPE_NAMES[dso.type] || 'Objet';
+      const typeName = getDSOTypeName(dso.type);
       const lines: string[] = [];
       lines.push(`<strong>${dso.id}</strong>`);
-      if (dso.nameFr) lines.push(dso.nameFr);
+      if (dso.displayName) lines.push(dso.displayName);
       lines.push(typeName);
-      if (dso.mag !== null) lines.push(`Magnitude : ${dso.mag.toFixed(1)}`);
+      if (dso.mag !== null) lines.push(`${t('stars.magnitude')} : ${dso.mag.toFixed(1)}`);
       const sizeStr = formatSize(dso.majAxis, dso.minAxis);
-      if (sizeStr !== '—') lines.push(`Taille : ${sizeStr}`);
+      if (sizeStr !== '—') lines.push(`${t('dso.size')} : ${sizeStr}`);
       tooltip.innerHTML = lines.join('<br>');
       tooltip.style.left = `${x + 15}px`;
       tooltip.style.top = `${y + 15}px`;

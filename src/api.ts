@@ -1,4 +1,5 @@
 import type { Photo, PhotoCorrespondence, PlateSolveResult, AstrometrySolveStatus } from './types';
+import { t } from './i18n';
 
 export interface StarSearchResult {
   hip: number;
@@ -48,27 +49,27 @@ export function uploadPhoto(
         try {
           resolve(JSON.parse(xhr.responseText));
         } catch {
-          reject(new Error('Réponse serveur invalide'));
+          reject(new Error(t('errors.invalidResponse')));
         }
       } else {
-        reject(new Error(`Échec de l'upload : ${xhr.responseText}`));
+        reject(new Error(t('errors.uploadFailed', { response: xhr.responseText })));
       }
     };
 
-    xhr.onerror = () => reject(new Error('Erreur réseau lors de l\'upload'));
+    xhr.onerror = () => reject(new Error(t('errors.networkError')));
     xhr.send(formData);
   });
 }
 
 export async function getPhotos(): Promise<Photo[]> {
   const res = await fetch('/api/photos');
-  if (!res.ok) throw new Error('Impossible de charger les photos');
+  if (!res.ok) throw new Error(t('errors.loadPhotos'));
   return res.json();
 }
 
 export async function deletePhotoAPI(id: string): Promise<void> {
   const res = await fetch(`/api/photos/${id}`, { method: 'DELETE' });
-  if (!res.ok) throw new Error('Impossible de supprimer la photo');
+  if (!res.ok) throw new Error(t('errors.deletePhoto'));
 }
 
 export async function solveWCS(file: File): Promise<PlateSolveResult> {
@@ -82,7 +83,7 @@ export async function solveWCS(file: File): Promise<PlateSolveResult> {
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Erreur WCS : ${text}`);
+    throw new Error(t('errors.wcsError', { text }));
   }
 
   return res.json();
@@ -99,7 +100,7 @@ export async function submitPlateSolve(file: File): Promise<{ jobId: string }> {
 
   if (!res.ok) {
     const data = await res.json();
-    throw new Error(data.error || 'Échec de la soumission');
+    throw new Error(data.error || t('errors.submitFailed'));
   }
 
   return res.json();
@@ -107,7 +108,7 @@ export async function submitPlateSolve(file: File): Promise<{ jobId: string }> {
 
 export async function pollPlateSolve(jobId: string): Promise<AstrometrySolveStatus> {
   const res = await fetch(`/api/solve-plate/${jobId}`);
-  if (!res.ok) throw new Error('Impossible de récupérer le statut');
+  if (!res.ok) throw new Error(t('errors.pollFailed'));
   return res.json();
 }
 
@@ -117,7 +118,7 @@ export async function solveWithASTAP(file: File): Promise<PlateSolveResult> {
   const res = await fetch('/api/solve-astap', { method: 'POST', body: fd });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    return { success: false, error: data.error ?? 'Erreur' };
+    return { success: false, error: data.error ?? t('errors.astapError') };
   }
   return res.json();
 }

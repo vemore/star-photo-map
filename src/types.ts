@@ -19,7 +19,7 @@ export interface ConstellationLine {
 export interface ConstellationInfo {
   id: string;
   name: string;
-  nameFr: string;
+  displayName: string;
   ra: number;
   dec: number;
 }
@@ -30,6 +30,8 @@ export interface PhotoCorrespondence {
   photoY: number;
   starHip: number;
   starName: string;
+  starRa?: number;   // direct RA (degrees) when starHip=0
+  starDec?: number;  // direct Dec (degrees) when starHip=0
 }
 
 export interface Photo {
@@ -102,7 +104,7 @@ export interface DSO {
   minAxis: number | null;   // arcminutes (null → même que majAxis)
   pa: number;           // angle de position, degrés E du nord
   mag: number | null;
-  nameFr: string | null;
+  displayName: string | null;
 }
 
 export interface DSOSearchResult {
@@ -116,4 +118,6 @@ export interface ManualPlacement {
   centerDec: number;
   rotationDeg: number;
   projPerPx: number;   // unités de projection par pixel photo
+  mirrorX: boolean;
+  mirrorY: boolean;
 }

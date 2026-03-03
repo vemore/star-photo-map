@@ -1,4 +1,5 @@
 import type { AffineMatrix, Point } from './types';
+import { t } from './i18n';
 
 /**
  * Compute affine transform from 3 point correspondences.
@@ -27,7 +28,7 @@ export function computeAffineTransform(
     Math.abs(p2.x), Math.abs(p2.y), 1,
   );
   if (Math.abs(det) < 1e-10 * scale * scale) {
-    throw new Error('Les points sont colinéaires');
+    throw new Error(t('errors.collinearPoints'));
   }
 
   const invDet = 1 / det;
@@ -55,7 +56,48 @@ export function computeAffineTransform(
   const f = inv[2][0] * c0.y + inv[2][1] * c1.y + inv[2][2] * c2.y;
 
   if (!isFinite(a) || !isFinite(b) || !isFinite(c) || !isFinite(d) || !isFinite(e) || !isFinite(f)) {
-    throw new Error('Transformation affine invalide');
+    throw new Error(t('errors.invalidAffine'));
+  }
+
+  return { a, b, c, d, e, f };
+}
+
+/**
+ * Compute similarity transform from 2 point correspondences.
+ * A similarity transform has 4 DOF: uniform scale, rotation, and translation.
+ * CSS matrix(a, b, -b, a, e, f).
+ */
+export function computeSimilarityTransform(
+  photoPoints: [Point, Point],
+  canvasPoints: [Point, Point],
+): AffineMatrix {
+  const [p0, p1] = photoPoints;
+  const [c0, c1] = canvasPoints;
+
+  const dpx = p1.x - p0.x;
+  const dpy = p1.y - p0.y;
+  const dcx = c1.x - c0.x;
+  const dcy = c1.y - c0.y;
+
+  const denom = dpx * dpx + dpy * dpy;
+  if (denom < 1e-10) {
+    throw new Error(t('errors.collinearPoints'));
+  }
+
+  // Solve for similarity: a = (dcx·dpx + dcy·dpy) / denom, b = (dcy·dpx - dcx·dpy) / denom
+  const a = (dcx * dpx + dcy * dpy) / denom;
+  const b = (dcy * dpx - dcx * dpy) / denom;
+
+  // c = -b, d = a for similarity (no mirror)
+  const c = -b;
+  const d = a;
+
+  // Translation: c0 = a·p0.x + c·p0.y + e  →  e = c0.x - a·p0.x - c·p0.y
+  const e = c0.x - a * p0.x - c * p0.y;
+  const f = c0.y - b * p0.x - d * p0.y;
+
+  if (!isFinite(a) || !isFinite(b) || !isFinite(e) || !isFinite(f)) {
+    throw new Error(t('errors.invalidAffine'));
   }
 
   return { a, b, c, d, e, f };
@@ -75,7 +117,13 @@ export function computeAffineLSQ(
   canvasPoints: Point[],
 ): AffineMatrix {
   const n = photoPoints.length;
-  if (n < 3) throw new Error('Au moins 3 points requis');
+  if (n < 2) throw new Error(t('errors.minPoints'));
+  if (n === 2) {
+    return computeSimilarityTransform(
+      photoPoints as [Point, Point],
+      canvasPoints as [Point, Point],
+    );
+  }
   if (n === 3) {
     return computeAffineTransform(
       photoPoints as [Point, Point, Point],
@@ -112,7 +160,7 @@ export function computeAffineLSQ(
   // Relative singularity threshold based on normal matrix scale
   const mScale = Math.max(Math.abs(m00), Math.abs(m11), m22, 1);
   if (Math.abs(det) < 1e-10 * mScale * mScale * mScale) {
-    throw new Error('Points colinéaires');
+    throw new Error(t('errors.collinearLSQ'));
   }
 
   // Solve M·x = rhs via Cramer's rule
@@ -127,7 +175,7 @@ export function computeAffineLSQ(
   const [b, d, f] = cramer(s_xY, s_yY, s_Y);
 
   if (!isFinite(a) || !isFinite(b) || !isFinite(c) || !isFinite(d) || !isFinite(e) || !isFinite(f)) {
-    throw new Error('Transformation affine invalide');
+    throw new Error(t('errors.invalidAffine'));
   }
 
   return { a, b, c, d, e, f };

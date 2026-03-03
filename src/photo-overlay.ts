@@ -1,14 +1,25 @@
 import type { Photo, PhotoCorrespondence, Star, Point, ViewState, ManualPlacement } from './types';
 import { project, toCanvas, unproject } from './projection';
-import { computeAffineTransform, computeAffineLSQ, affineToCSS } from './affine';
+import { computeAffineTransform, computeAffineLSQ, computeSimilarityTransform, affineToCSS } from './affine';
 import { getStarByHip, getStars } from './star-catalog';
 import { uploadPhoto, deletePhotoAPI, solveWCS, submitPlateSolve, pollPlateSolve, solveWithASTAP, searchStarsAPI } from './api';
-import { detectStarsFromFile } from './star-detector';
-import { solvePlate } from './plate-solver';
 import { showToast } from './toast';
 import type { SkyMap } from './sky-map';
+import { t } from './i18n';
 
 const MARKER_COLORS = ['#ff4444', '#44cc44', '#4488ff'];
+
+/** Get RA/Dec for a correspondence: use star catalog if starHip > 0, else use stored starRa/starDec */
+function getCorrRaDec(corr: PhotoCorrespondence): { ra: number; dec: number } | null {
+  if (corr.starHip > 0) {
+    const star = getStarByHip(corr.starHip);
+    return star ? { ra: star.ra, dec: star.dec } : null;
+  }
+  if (corr.starRa !== undefined && corr.starDec !== undefined) {
+    return { ra: corr.starRa, dec: corr.starDec };
+  }
+  return null;
+}
 
 interface PlacedPhoto {
   photo: Photo;
@@ -78,26 +89,31 @@ export class PhotoOverlay {
     const results: { name: string; corners: Point[] }[] = [];
 
     for (const placed of this.placedPhotos) {
-      if (!placed.visible || placed.photo.correspondences.length < 3) continue;
+      if (!placed.visible || placed.photo.correspondences.length < 2) continue;
 
       const photoPoints: Point[] = [];
       const canvasPoints: Point[] = [];
 
       for (const corr of placed.photo.correspondences) {
-        const star = getStarByHip(corr.starHip);
-        if (!star) continue;
-        const proj = project(star.ra, star.dec);
+        const raDec = getCorrRaDec(corr);
+        if (!raDec) continue;
+        const proj = project(raDec.ra, raDec.dec);
         const canvasPt = toCanvas(proj.x, proj.y, view);
         photoPoints.push({ x: corr.photoX, y: corr.photoY });
         canvasPoints.push(canvasPt);
       }
 
-      if (photoPoints.length < 3) continue;
+      if (photoPoints.length < 2) continue;
 
       try {
-        const matrix = photoPoints.length === 3
-          ? computeAffineTransform(photoPoints as [Point, Point, Point], canvasPoints as [Point, Point, Point])
-          : computeAffineLSQ(photoPoints, canvasPoints);
+        let matrix;
+        if (photoPoints.length === 2) {
+          matrix = computeSimilarityTransform(photoPoints as [Point, Point], canvasPoints as [Point, Point]);
+        } else if (photoPoints.length === 3) {
+          matrix = computeAffineTransform(photoPoints as [Point, Point, Point], canvasPoints as [Point, Point, Point]);
+        } else {
+          matrix = computeAffineLSQ(photoPoints, canvasPoints);
+        }
 
         const w = placed.imgEl.naturalWidth || placed.photo.width;
         const h = placed.imgEl.naturalHeight || placed.photo.height;
@@ -126,25 +142,30 @@ export class PhotoOverlay {
   /** Compute the center RA/Dec and ideal scale to fit a photo in the viewport */
   getPhotoCenterAndScale(photoId: string, viewWidth: number, viewHeight: number): { ra: number; dec: number; scale: number } | null {
     const placed = this.placedPhotos.find(p => p.photo.id === photoId);
-    if (!placed || placed.photo.correspondences.length < 3) return null;
+    if (!placed || placed.photo.correspondences.length < 2) return null;
 
     const photoPoints: Point[] = [];
     const projPoints: Point[] = [];
 
     for (const corr of placed.photo.correspondences) {
-      const star = getStarByHip(corr.starHip);
-      if (!star) continue;
-      const proj = project(star.ra, star.dec);
+      const raDec = getCorrRaDec(corr);
+      if (!raDec) continue;
+      const proj = project(raDec.ra, raDec.dec);
       photoPoints.push({ x: corr.photoX, y: corr.photoY });
       projPoints.push(proj);
     }
 
-    if (photoPoints.length < 3) return null;
+    if (photoPoints.length < 2) return null;
 
     try {
-      const matrix = photoPoints.length === 3
-        ? computeAffineTransform(photoPoints as [Point, Point, Point], projPoints as [Point, Point, Point])
-        : computeAffineLSQ(photoPoints, projPoints);
+      let matrix;
+      if (photoPoints.length === 2) {
+        matrix = computeSimilarityTransform(photoPoints as [Point, Point], projPoints as [Point, Point]);
+      } else if (photoPoints.length === 3) {
+        matrix = computeAffineTransform(photoPoints as [Point, Point, Point], projPoints as [Point, Point, Point]);
+      } else {
+        matrix = computeAffineLSQ(photoPoints, projPoints);
+      }
 
       const w = placed.imgEl.naturalWidth || placed.photo.width;
       const h = placed.imgEl.naturalHeight || placed.photo.height;
@@ -190,9 +211,9 @@ export class PhotoOverlay {
 
     let sumX = 0, sumY = 0, count = 0;
     for (const corr of placed.photo.correspondences) {
-      const star = getStarByHip(corr.starHip);
-      if (!star) continue;
-      const p = project(star.ra, star.dec);
+      const raDec = getCorrRaDec(corr);
+      if (!raDec) continue;
+      const p = project(raDec.ra, raDec.dec);
       sumX += p.x;
       sumY += p.y;
       count++;
@@ -265,7 +286,7 @@ export class PhotoOverlay {
     try {
       await deletePhotoAPI(photoId);
     } catch (err: any) {
-      showToast({ message: `Erreur de suppression : ${err.message}`, type: 'error', duration: 5000 });
+      showToast({ message: t('photos.deleteError', { message: err.message }), type: 'error', duration: 5000 });
       return;
     }
     const idx = this.placedPhotos.findIndex(p => p.photo.id === photoId);
@@ -306,33 +327,38 @@ export class PhotoOverlay {
 
   private applyTransform(placed: PlacedPhoto, view: ViewState) {
     const { photo, imgEl } = placed;
-    if (photo.correspondences.length < 3) return;
+    if (photo.correspondences.length < 2) return;
 
     const photoPoints: Point[] = [];
     const canvasPoints: Point[] = [];
 
     for (const corr of photo.correspondences) {
-      const star = getStarByHip(corr.starHip);
-      if (!star) continue;
+      const raDec = getCorrRaDec(corr);
+      if (!raDec) continue;
 
-      const proj = project(star.ra, star.dec);
+      const proj = project(raDec.ra, raDec.dec);
       const canvasPt = toCanvas(proj.x, proj.y, view);
       photoPoints.push({ x: corr.photoX, y: corr.photoY });
       canvasPoints.push(canvasPt);
     }
 
-    if (photoPoints.length < 3) return;
+    if (photoPoints.length < 2) return;
 
     try {
-      const matrix = photoPoints.length === 3
-        ? computeAffineTransform(photoPoints as [Point, Point, Point], canvasPoints as [Point, Point, Point])
-        : computeAffineLSQ(photoPoints, canvasPoints);
+      let matrix;
+      if (photoPoints.length === 2) {
+        matrix = computeSimilarityTransform(photoPoints as [Point, Point], canvasPoints as [Point, Point]);
+      } else if (photoPoints.length === 3) {
+        matrix = computeAffineTransform(photoPoints as [Point, Point, Point], canvasPoints as [Point, Point, Point]);
+      } else {
+        matrix = computeAffineLSQ(photoPoints, canvasPoints);
+      }
       imgEl.style.transform = affineToCSS(matrix);
     } catch {
       imgEl.style.display = 'none';
       if (!this.affineErrorShown.has(photo.id)) {
         this.affineErrorShown.add(photo.id);
-        showToast({ message: `Erreur de placement : ${photo.originalName}`, type: 'error', duration: 5000 });
+        showToast({ message: t('photos.placementError', { name: photo.originalName }), type: 'error', duration: 5000 });
       }
     }
   }
@@ -357,7 +383,7 @@ export class PhotoOverlay {
     const header = document.createElement('div');
     header.className = 'modal-header';
     header.innerHTML = `
-      <h2>Ajouter une photo sur la carte</h2>
+      <h2>${t('modal.title')}</h2>
       <button class="modal-close">&times;</button>
     `;
     modal.appendChild(header);
@@ -388,7 +414,7 @@ export class PhotoOverlay {
 
     const instructions = document.createElement('p');
     instructions.className = 'modal-instructions';
-    instructions.textContent = 'Cliquez sur 3 étoiles dans la photo, puis identifiez chacune.';
+    instructions.textContent = t('modal.instructions');
     formSide.appendChild(instructions);
 
     // --- Auto-solve section ---
@@ -400,7 +426,7 @@ export class PhotoOverlay {
 
     const autoTitle = document.createElement('div');
     autoTitle.className = 'auto-solve-title';
-    autoTitle.textContent = 'Résolution automatique';
+    autoTitle.textContent = t('modal.autoSolve');
     autoSection.appendChild(autoTitle);
 
     const autoBtns = document.createElement('div');
@@ -410,30 +436,23 @@ export class PhotoOverlay {
     const btnWCS = document.createElement('button');
     btnWCS.type = 'button';
     btnWCS.className = 'btn-auto-solve';
-    btnWCS.textContent = 'Métadonnées (WCS)';
+    btnWCS.textContent = t('modal.wcsButton');
     btnWCS.disabled = !isAstroFile;
-    btnWCS.title = isAstroFile ? 'Lire les données WCS du fichier' : 'Disponible pour les fichiers TIFF/FITS';
+    btnWCS.title = isAstroFile ? t('modal.wcsAvailable') : t('modal.wcsUnavailable');
     autoBtns.appendChild(btnWCS);
 
     // Online button
     const btnOnline = document.createElement('button');
     btnOnline.type = 'button';
     btnOnline.className = 'btn-auto-solve';
-    btnOnline.textContent = 'En ligne (astrometry.net)';
+    btnOnline.textContent = t('modal.onlineButton');
     autoBtns.appendChild(btnOnline);
-
-    // Local solve button
-    const btnLocal = document.createElement('button');
-    btnLocal.type = 'button';
-    btnLocal.className = 'btn-auto-solve full-width';
-    btnLocal.textContent = 'Résoudre localement';
-    autoBtns.appendChild(btnLocal);
 
     // ASTAP local solve button
     const btnASTAP = document.createElement('button');
     btnASTAP.type = 'button';
     btnASTAP.className = 'btn-auto-solve';
-    btnASTAP.textContent = 'ASTAP (local)';
+    btnASTAP.textContent = t('modal.astapButton');
     autoBtns.appendChild(btnASTAP);
 
     autoSection.appendChild(autoBtns);
@@ -452,8 +471,8 @@ export class PhotoOverlay {
     const manualBtn = document.createElement('button');
     manualBtn.type = 'button';
     manualBtn.className = 'btn-auto-solve full-width';
-    manualBtn.textContent = 'Placement manuel sur la carte';
-    manualBtn.title = 'Glisser-déposer la photo sur la carte';
+    manualBtn.textContent = t('modal.manualButton');
+    manualBtn.title = t('modal.manualTooltip');
     manualSection.appendChild(manualBtn);
     formSide.appendChild(manualSection);
 
@@ -465,7 +484,7 @@ export class PhotoOverlay {
     // Separator
     const separator = document.createElement('div');
     separator.className = 'auto-solve-separator';
-    separator.textContent = 'ou identification manuelle';
+    separator.textContent = t('modal.orManual');
     formSide.appendChild(separator);
 
     // Helper: set auto-solve status
@@ -481,14 +500,12 @@ export class PhotoOverlay {
     function disableAutoButtons() {
       btnWCS.disabled = true;
       btnOnline.disabled = true;
-      btnLocal.disabled = true;
       btnASTAP.disabled = true;
     }
 
     function enableAutoButtons() {
       btnWCS.disabled = !isAstroFile;
       btnOnline.disabled = false;
-      btnLocal.disabled = false;
       btnASTAP.disabled = false;
     }
 
@@ -514,19 +531,20 @@ export class PhotoOverlay {
 
       const status = document.createElement('span');
       status.className = 'point-status';
-      status.textContent = i === 0 ? 'Cliquez sur la photo...' : 'En attente';
+      status.textContent = i === 0 ? t('modal.clickPhoto') : t('modal.waiting');
       statusLabels.push(status);
 
       const searchWrapper = document.createElement('div');
       searchWrapper.className = 'search-wrapper';
       searchWrapper.style.display = 'none';
 
+      // --- Star search row ---
       const searchRow = document.createElement('div');
       searchRow.className = 'search-row';
 
       const searchInput = document.createElement('input');
       searchInput.type = 'text';
-      searchInput.placeholder = 'Rechercher une étoile...';
+      searchInput.placeholder = t('modal.searchStar');
       searchInput.className = 'star-search-input';
       searchInputs.push(searchInput);
 
@@ -537,8 +555,8 @@ export class PhotoOverlay {
         const pickBtn = document.createElement('button');
         pickBtn.type = 'button';
         pickBtn.className = 'btn-pick-map';
-        pickBtn.title = 'Choisir sur la carte';
-        pickBtn.textContent = 'Carte';
+        pickBtn.title = t('modal.mapPickTooltip');
+        pickBtn.textContent = t('modal.mapPick');
         pickBtns.push(pickBtn);
         searchRow.appendChild(pickBtn);
 
@@ -565,11 +583,77 @@ export class PhotoOverlay {
         });
       }
 
+      // RA/Dec mode toggle button
+      const raDecToggle = document.createElement('button');
+      raDecToggle.type = 'button';
+      raDecToggle.className = 'btn-pick-map';
+      raDecToggle.title = t('modal.raDecTooltip');
+      raDecToggle.textContent = t('modal.raDecMode');
+      searchRow.appendChild(raDecToggle);
+
+      // --- RA/Dec input row (hidden by default) ---
+      const raDecRow = document.createElement('div');
+      raDecRow.className = 'search-row radec-row';
+      raDecRow.style.display = 'none';
+
+      const raInput = document.createElement('input');
+      raInput.type = 'number';
+      raInput.placeholder = t('modal.raPlaceholder');
+      raInput.className = 'radec-input';
+      raInput.step = 'any';
+      raInput.min = '0';
+      raInput.max = '360';
+
+      const decInput = document.createElement('input');
+      decInput.type = 'number';
+      decInput.placeholder = t('modal.decPlaceholder');
+      decInput.className = 'radec-input';
+      decInput.step = 'any';
+      decInput.min = '-90';
+      decInput.max = '90';
+
+      const raDecOk = document.createElement('button');
+      raDecOk.type = 'button';
+      raDecOk.className = 'btn-pick-map';
+      raDecOk.textContent = 'OK';
+
+      const starToggle = document.createElement('button');
+      starToggle.type = 'button';
+      starToggle.className = 'btn-pick-map';
+      starToggle.title = t('modal.starModeTooltip');
+      starToggle.textContent = t('modal.starMode');
+
+      raDecRow.appendChild(raInput);
+      raDecRow.appendChild(decInput);
+      raDecRow.appendChild(raDecOk);
+      raDecRow.appendChild(starToggle);
+
+      // Toggle between modes
+      raDecToggle.addEventListener('click', () => {
+        searchRow.style.display = 'none';
+        raDecRow.style.display = '';
+        raInput.focus();
+      });
+      starToggle.addEventListener('click', () => {
+        raDecRow.style.display = 'none';
+        searchRow.style.display = '';
+        searchInput.focus();
+      });
+
+      // RA/Dec OK handler
+      raDecOk.addEventListener('click', () => {
+        const ra = parseFloat(raInput.value);
+        const dec = parseFloat(decInput.value);
+        if (isNaN(ra) || isNaN(dec) || ra < 0 || ra >= 360 || dec < -90 || dec > 90) return;
+        selectRaDec(i, ra, dec);
+      });
+
       const dropdown = document.createElement('div');
       dropdown.className = 'search-dropdown';
       dropdowns.push(dropdown);
 
       searchWrapper.appendChild(searchRow);
+      searchWrapper.appendChild(raDecRow);
       searchWrapper.appendChild(dropdown);
 
       info.appendChild(status);
@@ -645,14 +729,14 @@ export class PhotoOverlay {
     // Submit button
     const submitBtn = document.createElement('button');
     submitBtn.className = 'modal-submit';
-    submitBtn.textContent = 'Placer sur la carte';
+    submitBtn.textContent = t('modal.submit');
     submitBtn.disabled = true;
     formSide.appendChild(submitBtn);
 
     // Cancel button
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'modal-cancel';
-    cancelBtn.textContent = 'Annuler';
+    cancelBtn.textContent = t('modal.cancel');
     cancelBtn.addEventListener('click', () => backdrop.remove());
     formSide.appendChild(cancelBtn);
 
@@ -716,7 +800,7 @@ export class PhotoOverlay {
       // Show search input
       const searchWrapper = pointEntries[idx].querySelector('.search-wrapper') as HTMLElement;
       searchWrapper.style.display = 'block';
-      statusLabels[idx].textContent = `Position définie`;
+      statusLabels[idx].textContent = t('modal.positionSet');
       searchInputs[idx].focus();
 
       // Advance active index to next incomplete point
@@ -727,10 +811,12 @@ export class PhotoOverlay {
       if (!points[idx]) return;
       points[idx]!.starHip = 0;
       points[idx]!.starName = '';
+      points[idx]!.starRa = undefined;
+      points[idx]!.starDec = undefined;
       searchInputs[idx].disabled = false;
       searchInputs[idx].value = '';
       if (pickBtns[idx]) pickBtns[idx].disabled = false;
-      statusLabels[idx].textContent = 'Position définie';
+      statusLabels[idx].textContent = t('modal.positionSet');
       statusLabels[idx].className = 'point-status';
       statusLabels[idx].onclick = null;
       pointEntries[idx].classList.remove('complete');
@@ -747,6 +833,8 @@ export class PhotoOverlay {
       if (!points[idx]) return;
       points[idx]!.starHip = star.hip;
       points[idx]!.starName = label;
+      points[idx]!.starRa = undefined;
+      points[idx]!.starDec = undefined;
       statusLabels[idx].textContent = label;
       statusLabels[idx].className = 'point-status point-complete';
       searchInputs[idx].value = label;
@@ -763,15 +851,42 @@ export class PhotoOverlay {
       checkComplete();
     }
 
+    function selectRaDec(idx: number, ra: number, dec: number) {
+      if (!points[idx]) return;
+      points[idx]!.starHip = 0;
+      points[idx]!.starRa = ra;
+      points[idx]!.starDec = dec;
+      const label = t('modal.raDecSet', { ra: ra.toFixed(2), dec: dec.toFixed(2) });
+      points[idx]!.starName = label;
+      statusLabels[idx].textContent = label;
+      statusLabels[idx].className = 'point-status point-complete';
+      searchInputs[idx].value = label;
+      searchInputs[idx].disabled = true;
+      pointEntries[idx].classList.add('complete');
+
+      if (pickBtns[idx]) {
+        pickBtns[idx].disabled = true;
+      }
+
+      markStarComplete(idx);
+      updateActiveIndex();
+      checkComplete();
+    }
+
+    function isPointComplete(p: PhotoCorrespondence | null): boolean {
+      if (!p) return false;
+      return p.starHip !== 0 || (p.starRa !== undefined && p.starDec !== undefined);
+    }
+
     function updateActiveIndex() {
       // Find first incomplete point
       for (let i = 0; i < 3; i++) {
-        if (!points[i] || points[i]!.starHip === 0) {
+        if (!isPointComplete(points[i])) {
           activeIndex = i;
           // Update instructions
           for (let j = 0; j < 3; j++) {
             if (j === i && (!points[j] || points[j]!.photoX === undefined)) {
-              statusLabels[j].textContent = 'Cliquez sur la photo...';
+              statusLabels[j].textContent = t('modal.clickPhoto');
             }
           }
           return;
@@ -781,8 +896,9 @@ export class PhotoOverlay {
     }
 
     function checkComplete() {
-      const allDone = points.every(p => p && p.starHip !== 0);
-      submitBtn.disabled = !allDone;
+      // Allow submission with 2+ complete points (2 = similarity transform, 3 = full affine)
+      const completeCount = points.filter(p => isPointComplete(p)).length;
+      submitBtn.disabled = completeCount < 2;
     }
 
     // --- Auto-solve: apply result ---
@@ -828,15 +944,15 @@ export class PhotoOverlay {
     // --- WCS button handler ---
     btnWCS.addEventListener('click', async () => {
       disableAutoButtons();
-      setAutoStatus('Lecture des métadonnées WCS…', 'solving');
+      setAutoStatus(t('modal.readingWCS'), 'solving');
 
       try {
         const result = await solveWCS(file);
         if (result.success && result.correspondences) {
-          setAutoStatus('Métadonnées WCS trouvées !', 'success');
+          setAutoStatus(t('modal.wcsFound'), 'success');
           applyAutoSolveResult(result.correspondences);
         } else {
-          setAutoStatus(result.error || 'Aucune donnée WCS trouvée', 'failed');
+          setAutoStatus(result.error || t('modal.wcsNotFound'), 'failed');
           enableAutoButtons();
         }
       } catch (err: any) {
@@ -853,7 +969,7 @@ export class PhotoOverlay {
 
       function updateTimer() {
         const elapsed = Math.round((Date.now() - startTime) / 1000);
-        setAutoStatus(`Résolution en cours… (${elapsed}s)`, 'solving');
+        setAutoStatus(t('modal.solvingOnline', { seconds: elapsed }), 'solving');
       }
 
       updateTimer();
@@ -875,12 +991,12 @@ export class PhotoOverlay {
           if (status.status === 'solved' && status.correspondences) {
             if (timerInterval) clearInterval(timerInterval);
             const elapsed = Math.round((Date.now() - startTime) / 1000);
-            setAutoStatus(`Résolu en ${elapsed}s !`, 'success');
+            setAutoStatus(t('modal.solvedOnline', { seconds: elapsed }), 'success');
             applyAutoSolveResult(status.correspondences);
             return;
           } else if (status.status === 'failed' || status.status === 'timeout') {
             if (timerInterval) clearInterval(timerInterval);
-            setAutoStatus(status.error || 'Résolution échouée', 'failed');
+            setAutoStatus(status.error || t('modal.solveFailed'), 'failed');
             enableAutoButtons();
             return;
           }
@@ -888,51 +1004,10 @@ export class PhotoOverlay {
 
         // Timeout
         if (timerInterval) clearInterval(timerInterval);
-        setAutoStatus('Timeout : la résolution a pris trop de temps', 'failed');
+        setAutoStatus(t('modal.solveTimeout'), 'failed');
         enableAutoButtons();
       } catch (err: any) {
         if (timerInterval) clearInterval(timerInterval);
-        setAutoStatus(err.message, 'failed');
-        enableAutoButtons();
-      }
-    });
-
-    // --- Local solve button handler ---
-    btnLocal.addEventListener('click', async () => {
-      disableAutoButtons();
-      setAutoStatus('Détection des étoiles…', 'solving');
-
-      try {
-        const detection = await detectStarsFromFile(file);
-        const spotCount = detection.spots.length;
-
-        if (spotCount < 3) {
-          setAutoStatus('Pas assez d\'étoiles détectées dans l\'image', 'failed');
-          enableAutoButtons();
-          return;
-        }
-
-        setAutoStatus(`${spotCount} étoiles détectées. Recherche de correspondances…`, 'solving');
-
-        // Use setTimeout to let the UI update before the CPU-heavy solve
-        await new Promise(r => setTimeout(r, 50));
-
-        const result = await solvePlate(detection.spots, detection.imageWidth, detection.imageHeight);
-
-        if (result.success && result.correspondences) {
-          // Scale correspondences from detection size to original image size
-          const scaledCorrespondences = result.correspondences.map(c => ({
-            ...c,
-            photoX: c.photoX * detection.scaleFromOriginal,
-            photoY: c.photoY * detection.scaleFromOriginal,
-          }));
-          setAutoStatus('Résolution locale réussie !', 'success');
-          applyAutoSolveResult(scaledCorrespondences);
-        } else {
-          setAutoStatus(result.error || 'Aucune solution trouvée', 'failed');
-          enableAutoButtons();
-        }
-      } catch (err: any) {
         setAutoStatus(err.message, 'failed');
         enableAutoButtons();
       }
@@ -941,16 +1016,16 @@ export class PhotoOverlay {
     // --- ASTAP button handler ---
     btnASTAP.addEventListener('click', async () => {
       disableAutoButtons();
-      setAutoStatus('Résolution ASTAP en cours…', 'solving');
+      setAutoStatus(t('modal.solvingASTAP'), 'solving');
 
       try {
         const result = await solveWithASTAP(file);
 
         if (result.success && result.correspondences && result.correspondences.length >= 3) {
-          setAutoStatus('Résolu par ASTAP !', 'success');
+          setAutoStatus(t('modal.astapSuccess'), 'success');
           applyAutoSolveResult(result.correspondences);
         } else {
-          setAutoStatus(result.error ?? 'Échec ASTAP', 'failed');
+          setAutoStatus(result.error ?? t('modal.astapFailed'), 'failed');
           enableAutoButtons();
         }
       } catch (err: any) {
@@ -961,13 +1036,13 @@ export class PhotoOverlay {
 
     submitBtn.addEventListener('click', async () => {
       submitBtn.disabled = true;
-      submitBtn.textContent = 'Envoi en cours...';
+      submitBtn.textContent = t('modal.submitting');
       progressBar.style.display = 'block';
       progressFill.style.width = '0%';
 
       try {
         const correspondences = [
-          ...(points.filter(Boolean) as PhotoCorrespondence[]),
+          ...(points.filter(p => isPointComplete(p)) as PhotoCorrespondence[]),
           ...extraAutoCorrespondences,
         ];
         const photo = await uploadPhoto(file, correspondences, (fraction) => {
@@ -977,9 +1052,9 @@ export class PhotoOverlay {
         this.onPhotosChanged?.();
         backdrop.remove();
       } catch (err: any) {
-        showToast({ message: `Erreur : ${err.message}`, type: 'error', duration: 5000 });
+        showToast({ message: t('modal.uploadError', { message: err.message }), type: 'error', duration: 5000 });
         submitBtn.disabled = false;
-        submitBtn.textContent = 'Placer sur la carte';
+        submitBtn.textContent = t('modal.submit');
         progressBar.style.display = 'none';
       }
     });
@@ -997,7 +1072,6 @@ export class PhotoOverlay {
     imgEl.style.cursor = 'move';
     const objUrl = URL.createObjectURL(file);
     imgEl.src = objUrl;
-    this.container.style.pointerEvents = 'auto';
     this.container.appendChild(imgEl);
 
     let naturalWidth = 0;
@@ -1015,6 +1089,8 @@ export class PhotoOverlay {
       centerDec: 60,
       rotationDeg: 0,
       projPerPx: 0.002,
+      mirrorX: false,
+      mirrorY: false,
     };
 
     // Initialize to current map center
@@ -1029,19 +1105,21 @@ export class PhotoOverlay {
     const toolbar = document.createElement('div');
     toolbar.className = 'manual-toolbar';
     toolbar.innerHTML = `
-      <span class="manual-toolbar-label">Mode placement manuel</span>
+      <span class="manual-toolbar-label">${t('manual.modeLabel')}</span>
       <label class="manual-toolbar-item">
-        Rotation&nbsp;
+        ${t('manual.rotation')}&nbsp;
         <input type="range" min="-180" max="180" value="0" step="1" class="manual-rotation-range">
         <span class="manual-rotation-val">0°</span>
       </label>
       <label class="manual-toolbar-item">
-        Zoom photo&nbsp;
+        ${t('manual.photoZoom')}&nbsp;
         <input type="range" min="-6" max="2" value="0" step="0.1" class="manual-zoom-range">
       </label>
+      <button class="manual-mirror-btn" data-axis="x">${t('manual.mirrorX')}</button>
+      <button class="manual-mirror-btn" data-axis="y">${t('manual.mirrorY')}</button>
       <div class="manual-toolbar-buttons">
-        <button class="manual-validate-btn">Valider</button>
-        <button class="manual-cancel-btn">Annuler</button>
+        <button class="manual-validate-btn">${t('manual.validate')}</button>
+        <button class="manual-cancel-btn">${t('manual.cancel')}</button>
       </div>
     `;
     document.body.appendChild(toolbar);
@@ -1123,11 +1201,26 @@ export class PhotoOverlay {
       redraw(this.getView());
     });
 
+    // Mirror buttons
+    const mirrorBtnX = toolbar.querySelector('.manual-mirror-btn[data-axis="x"]') as HTMLButtonElement;
+    const mirrorBtnY = toolbar.querySelector('.manual-mirror-btn[data-axis="y"]') as HTMLButtonElement;
+
+    mirrorBtnX.addEventListener('click', () => {
+      placement.mirrorX = !placement.mirrorX;
+      mirrorBtnX.classList.toggle('active', placement.mirrorX);
+      redraw(this.getView());
+    });
+
+    mirrorBtnY.addEventListener('click', () => {
+      placement.mirrorY = !placement.mirrorY;
+      mirrorBtnY.classList.toggle('active', placement.mirrorY);
+      redraw(this.getView());
+    });
+
     const cleanup = () => {
       imgEl.remove();
       toolbar.remove();
       URL.revokeObjectURL(objUrl);
-      this.container.style.pointerEvents = 'none';
     };
 
     // Cancel
@@ -1137,14 +1230,14 @@ export class PhotoOverlay {
     validateBtn.addEventListener('click', async () => {
       if (!naturalWidth || !naturalHeight) return;
       validateBtn.disabled = true;
-      validateBtn.textContent = 'Traitement…';
+      validateBtn.textContent = t('manual.processing');
 
       try {
         const correspondences = buildSyntheticCorrespondences(placement, naturalWidth, naturalHeight);
         if (!correspondences) {
-          showToast({ message: 'Impossible de trouver des étoiles de correspondance. Essayez de repositionner la photo.', type: 'error', duration: 5000 });
+          showToast({ message: t('manual.noStarsFound'), type: 'error', duration: 5000 });
           validateBtn.disabled = false;
-          validateBtn.textContent = 'Valider';
+          validateBtn.textContent = t('manual.validate');
           return;
         }
         const photo = await uploadPhoto(file, correspondences);
@@ -1152,9 +1245,9 @@ export class PhotoOverlay {
         this.addPhotoToMap(photo);
         this.onPhotosChanged?.();
       } catch (err: any) {
-        showToast({ message: `Erreur : ${err.message}`, type: 'error', duration: 5000 });
+        showToast({ message: t('modal.uploadError', { message: err.message }), type: 'error', duration: 5000 });
         validateBtn.disabled = false;
-        validateBtn.textContent = 'Valider';
+        validateBtn.textContent = t('manual.validate');
       }
     });
   }
@@ -1175,6 +1268,10 @@ function applyManualTransform(
   // Scale: projection units per pixel * view scale = canvas pixels per photo pixel
   const pxPerPx = placement.projPerPx * view.scale;
 
+  // Mirror factors
+  const mx = placement.mirrorX ? -1 : 1;
+  const my = placement.mirrorY ? -1 : 1;
+
   // Rotation angle (convert PA to canvas angle)
   const rotRad = placement.rotationDeg * Math.PI / 180;
 
@@ -1183,16 +1280,17 @@ function applyManualTransform(
   const cx = natW / 2;
   const cy = natH / 2;
 
-  const cos = Math.cos(rotRad) * pxPerPx;
-  const sin = Math.sin(rotRad) * pxPerPx;
+  const cosR = Math.cos(rotRad) * pxPerPx;
+  const sinR = Math.sin(rotRad) * pxPerPx;
 
   // matrix(a, b, c, d, e, f): maps (photoX, photoY) → canvas
-  const a = cos;
-  const b = sin;
-  const c = -sin;
-  const d = cos;
-  const e = centerCanvas.x - cos * cx + sin * cy;
-  const f = centerCanvas.y - sin * cx - cos * cy;
+  // Apply mirror before rotation: first mirror the photo coords, then rotate+scale
+  const a = cosR * mx;
+  const b = sinR * mx;
+  const c = -sinR * my;
+  const d = cosR * my;
+  const e = centerCanvas.x - a * cx - c * cy;
+  const f = centerCanvas.y - b * cx - d * cy;
 
   imgEl.style.transform = `matrix(${a}, ${b}, ${c}, ${d}, ${e}, ${f})`;
 }
@@ -1215,6 +1313,8 @@ function buildSyntheticCorrespondences(
   const rotRad = placement.rotationDeg * Math.PI / 180;
   const cos = Math.cos(rotRad);
   const sin = Math.sin(rotRad);
+  const mx = placement.mirrorX ? -1 : 1;
+  const my = placement.mirrorY ? -1 : 1;
   const cx = natW / 2;
   const cy = natH / 2;
 
@@ -1224,9 +1324,9 @@ function buildSyntheticCorrespondences(
 
   for (let idx = 0; idx < 3; idx++) {
     const [px, py] = photoPoints[idx];
-    // Map photo pixel → projection coords
-    const dpx = px - cx;
-    const dpy = py - cy;
+    // Map photo pixel → projection coords (apply mirror then rotation)
+    const dpx = (px - cx) * mx;
+    const dpy = (py - cy) * my;
     const projX = centerProj.x + (cos * dpx - sin * dpy) * pxPerPx;
     const projY = centerProj.y - (sin * dpx + cos * dpy) * pxPerPx;
     const sky = unproject(projX, projY);
@@ -1253,9 +1353,9 @@ function buildSyntheticCorrespondences(
     const starProj = project(nearest.ra, nearest.dec);
     const dsprojX = starProj.x - centerProj.x;
     const dsprojY = starProj.y - centerProj.y;
-    // Inverse rotation
-    const dphotoX = (cos * dsprojX - sin * dsprojY) / pxPerPx;
-    const dphotoY = -(sin * dsprojX + cos * dsprojY) / pxPerPx;
+    // Inverse rotation then inverse mirror
+    const dphotoX = (cos * dsprojX - sin * dsprojY) / pxPerPx * mx;
+    const dphotoY = -(sin * dsprojX + cos * dsprojY) / pxPerPx * my;
     const starPhotoX = cx + dphotoX;
     const starPhotoY = cy + dphotoY;
 

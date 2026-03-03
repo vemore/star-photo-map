@@ -1,4 +1,5 @@
 import type { Star, ConstellationLine, ConstellationInfo } from './types';
+import { getLang, t } from './i18n';
 
 let stars: Star[] = [];
 let starsByHip = new Map<number, Star>();
@@ -14,7 +15,7 @@ function normalizeRA(ra: number): number {
 async function fetchJSON(url: string): Promise<any> {
   const res = await fetch(url);
   if (!res.ok) {
-    throw new Error(`Impossible de charger ${url} (${res.status} ${res.statusText})`);
+    throw new Error(t('errors.catalogLoad', { url, status: res.status, statusText: res.statusText }));
   }
   return res.json();
 }
@@ -62,11 +63,15 @@ export async function loadCatalog(): Promise<void> {
   }
 
   // Parse constellation info
+  const lang = getLang();
   for (const f of constData.features) {
+    const displayName = lang === 'fr'
+      ? (f.properties.fr || f.properties.name)
+      : f.properties.name;
     constellationInfos.push({
       id: f.id,
       name: f.properties.name,
-      nameFr: f.properties.fr || f.properties.name,
+      displayName,
       ra: normalizeRA(f.geometry.coordinates[0]),
       dec: f.geometry.coordinates[1],
     });

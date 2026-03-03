@@ -1,6 +1,7 @@
 import type { DetectedSpot, PlateSolveResult, PhotoCorrespondence, Star } from './types';
 import { getStars } from './star-catalog';
 import { project } from './projection';
+import { t } from './i18n';
 
 const DEG2RAD = Math.PI / 180;
 const BIN_SIZE = 0.002;
@@ -176,7 +177,7 @@ export async function solvePlate(
   }
 
   if (spots.length < 3) {
-    return { success: false, error: 'Pas assez d\'étoiles détectées' };
+    return { success: false, error: t('errors.notEnoughStars') };
   }
 
   const bestMatch = findBestMatch(spots, imageWidth, imageHeight);
@@ -185,7 +186,7 @@ export async function solvePlate(
     return buildResult(bestMatch);
   }
 
-  return { success: false, error: 'Aucune solution trouvée' };
+  return { success: false, error: t('errors.noSolution') };
 }
 
 function buildResult(match: { correspondences: PhotoCorrespondence[]; verified: number }): PlateSolveResult {

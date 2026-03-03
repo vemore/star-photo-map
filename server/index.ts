@@ -75,7 +75,7 @@ app.use('/uploads', express.static(UPLOADS_DIR));
 app.use('/api', (req, res, next) => {
   const ip = req.ip || req.socket.remoteAddress || 'unknown';
   if (!checkRateLimit(ip, API_LIMIT)) {
-    res.status(429).json({ error: 'Trop de requêtes, réessayez dans un instant' });
+    res.status(429).json({ error: 'Trop de requêtes, réessayez dans un instant', code: 'RATE_LIMIT' });
     return;
   }
   next();
@@ -86,26 +86,26 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
   try {
     const ip = req.ip || req.socket.remoteAddress || 'unknown';
     if (!checkRateLimit(ip + ':upload', UPLOAD_LIMIT)) {
-      res.status(429).json({ error: 'Trop d\'uploads, réessayez dans un instant' });
+      res.status(429).json({ error: 'Trop d\'uploads, réessayez dans un instant', code: 'UPLOAD_RATE_LIMIT' });
       return;
     }
 
     const file = req.file;
     if (!file) {
-      res.status(400).json({ error: 'Aucun fichier fourni' });
+      res.status(400).json({ error: 'Aucun fichier fourni', code: 'NO_FILE' });
       return;
     }
 
     // Validate file extension
     const fileExt = path.extname(file.originalname).toLowerCase();
     if (!ALLOWED_EXTENSIONS.has(fileExt)) {
-      res.status(400).json({ error: `Extension non autorisée : ${fileExt}` });
+      res.status(400).json({ error: `Extension non autorisée : ${fileExt}`, code: 'INVALID_EXTENSION' });
       return;
     }
 
     const corrJson = req.body?.correspondences;
     if (!corrJson) {
-      res.status(400).json({ error: 'Correspondances manquantes' });
+      res.status(400).json({ error: 'Correspondances manquantes', code: 'MISSING_CORRESPONDENCES' });
       return;
     }
 
@@ -113,34 +113,41 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
     try {
       correspondences = JSON.parse(corrJson);
     } catch {
-      res.status(400).json({ error: 'JSON des correspondances invalide' });
+      res.status(400).json({ error: 'JSON des correspondances invalide', code: 'INVALID_JSON' });
       return;
     }
-    if (!Array.isArray(correspondences) || correspondences.length < 3) {
-      res.status(400).json({ error: 'Au moins 3 correspondances requises' });
+    if (!Array.isArray(correspondences) || correspondences.length < 2) {
+      res.status(400).json({ error: 'Au moins 2 correspondances requises', code: 'MIN_CORRESPONDENCES' });
       return;
     }
     if (correspondences.length > MAX_CORRESPONDENCES) {
-      res.status(400).json({ error: `Trop de correspondances (max ${MAX_CORRESPONDENCES})` });
+      res.status(400).json({ error: `Trop de correspondances (max ${MAX_CORRESPONDENCES})`, code: 'MAX_CORRESPONDENCES' });
       return;
     }
 
     // Validate each correspondence field
     for (const c of correspondences) {
-      if (!Number.isInteger(c.pointIndex) || c.pointIndex < 0 || c.pointIndex > 2) {
-        res.status(400).json({ error: 'pointIndex invalide (entier 0-2 attendu)' });
+      if (!Number.isInteger(c.pointIndex) || c.pointIndex < 0) {
+        res.status(400).json({ error: 'pointIndex invalide (entier >= 0 attendu)', code: 'INVALID_POINT_INDEX' });
         return;
       }
       if (typeof c.photoX !== 'number' || !Number.isFinite(c.photoX) || c.photoX < 0) {
-        res.status(400).json({ error: 'photoX invalide (nombre positif attendu)' });
+        res.status(400).json({ error: 'photoX invalide (nombre positif attendu)', code: 'INVALID_PHOTO_X' });
         return;
       }
       if (typeof c.photoY !== 'number' || !Number.isFinite(c.photoY) || c.photoY < 0) {
-        res.status(400).json({ error: 'photoY invalide (nombre positif attendu)' });
+        res.status(400).json({ error: 'photoY invalide (nombre positif attendu)', code: 'INVALID_PHOTO_Y' });
         return;
       }
-      if (!Number.isInteger(c.starHip) || c.starHip <= 0) {
-        res.status(400).json({ error: 'starHip invalide (entier positif attendu)' });
+      // starHip=0 is allowed when starRa/starDec are provided (direct RA/Dec input)
+      if (c.starHip === 0) {
+        if (typeof c.starRa !== 'number' || !Number.isFinite(c.starRa) ||
+            typeof c.starDec !== 'number' || !Number.isFinite(c.starDec)) {
+          res.status(400).json({ error: 'starRa/starDec requis quand starHip=0', code: 'INVALID_STAR_HIP' });
+          return;
+        }
+      } else if (!Number.isInteger(c.starHip) || c.starHip <= 0) {
+        res.status(400).json({ error: 'starHip invalide (entier positif attendu)', code: 'INVALID_STAR_HIP' });
         return;
       }
     }
@@ -181,6 +188,8 @@ app.post('/api/photos', upload.single('photo'), async (req, res) => {
       photoY: c.photoY * scaleY,
       starHip: c.starHip,
       starName: c.starName || '',
+      starRa: c.starRa ?? null,
+      starDec: c.starDec ?? null,
     }));
 
     // Store in database
@@ -218,7 +227,7 @@ app.delete('/api/photos/:id', (req, res) => {
     const filename = getPhotoFilename(id);
 
     if (!filename) {
-      res.status(404).json({ error: 'Photo introuvable' });
+      res.status(404).json({ error: 'Photo introuvable', code: 'PHOTO_NOT_FOUND' });
       return;
     }
 
@@ -240,19 +249,19 @@ app.post('/api/solve-wcs', upload.single('photo'), async (req, res) => {
   try {
     const file = req.file;
     if (!file) {
-      res.status(400).json({ success: false, error: 'Aucun fichier fourni' });
+      res.status(400).json({ success: false, error: 'Aucun fichier fourni', code: 'NO_FILE' });
       return;
     }
 
     const ext = path.extname(file.originalname).toLowerCase();
     if (!['.tif', '.tiff', '.fits', '.fit'].includes(ext)) {
-      res.status(400).json({ success: false, error: 'Format non supporté. Utilisez TIFF ou FITS.' });
+      res.status(400).json({ success: false, error: 'Format non supporté. Utilisez TIFF ou FITS.', code: 'UNSUPPORTED_FORMAT' });
       return;
     }
 
     const wcs = extractWCS(file.buffer, ext);
     if (!wcs) {
-      res.json({ success: false, error: 'Aucune donnée WCS trouvée dans le fichier' });
+      res.json({ success: false, error: 'Aucune donnée WCS trouvée dans le fichier', code: 'NO_WCS_DATA' });
       return;
     }
 
@@ -272,7 +281,7 @@ app.post('/api/solve-wcs', upload.single('photo'), async (req, res) => {
     }
 
     if (!imageWidth || !imageHeight) {
-      res.json({ success: false, error: 'Dimensions de l\'image introuvables' });
+      res.json({ success: false, error: 'Dimensions de l\'image introuvables', code: 'NO_IMAGE_DIMENSIONS' });
       return;
     }
 
@@ -280,7 +289,7 @@ app.post('/api/solve-wcs', upload.single('photo'), async (req, res) => {
     const correspondences = wcsToCorrespondences(wcs, imageWidth, imageHeight);
 
     if (correspondences.length < 3) {
-      res.json({ success: false, error: 'Pas assez d\'étoiles du catalogue dans le champ' });
+      res.json({ success: false, error: 'Pas assez d\'étoiles du catalogue dans le champ', code: 'NOT_ENOUGH_CATALOG_STARS' });
       return;
     }
 
@@ -294,11 +303,11 @@ app.post('/api/solve-wcs', upload.single('photo'), async (req, res) => {
 // --- ASTAP local plate solve route ---
 app.post('/api/solve-astap', upload.single('photo'), async (req, res) => {
   if (!req.file) {
-    res.status(400).json({ error: 'Fichier manquant' });
+    res.status(400).json({ error: 'Fichier manquant', code: 'MISSING_FILE' });
     return;
   }
   if (!isASTAPInstalled()) {
-    res.status(400).json({ error: 'ASTAP non installé (définir ASTAP_PATH)' });
+    res.status(400).json({ error: 'ASTAP non installé (définir ASTAP_PATH)', code: 'ASTAP_NOT_INSTALLED' });
     return;
   }
 
@@ -317,13 +326,13 @@ app.post('/api/solve-astap', upload.single('photo'), async (req, res) => {
 app.post('/api/solve-plate', upload.single('photo'), async (req, res) => {
   try {
     if (!isAstrometryConfigured()) {
-      res.status(400).json({ error: 'ASTROMETRY_API_KEY non configurée sur le serveur' });
+      res.status(400).json({ error: 'ASTROMETRY_API_KEY non configurée sur le serveur', code: 'ASTROMETRY_NOT_CONFIGURED' });
       return;
     }
 
     const file = req.file;
     if (!file) {
-      res.status(400).json({ error: 'Aucun fichier fourni' });
+      res.status(400).json({ error: 'Aucun fichier fourni', code: 'NO_FILE' });
       return;
     }
 
@@ -347,7 +356,7 @@ app.post('/api/solve-plate', upload.single('photo'), async (req, res) => {
     }
 
     if (!imageWidth || !imageHeight) {
-      res.status(400).json({ error: 'Impossible de déterminer les dimensions de l\'image' });
+      res.status(400).json({ error: 'Impossible de déterminer les dimensions de l\'image', code: 'CANNOT_DETERMINE_DIMENSIONS' });
       return;
     }
 
@@ -362,7 +371,7 @@ app.post('/api/solve-plate', upload.single('photo'), async (req, res) => {
 app.get('/api/solve-plate/:id', (req, res) => {
   const job = getJobStatus(req.params.id);
   if (!job) {
-    res.status(404).json({ error: 'Job introuvable' });
+    res.status(404).json({ error: 'Job introuvable', code: 'JOB_NOT_FOUND' });
     return;
   }
 
@@ -390,12 +399,12 @@ app.get('/api/stars/:hip', (req, res) => {
   try {
     const hip = parseInt(req.params.hip, 10);
     if (isNaN(hip)) {
-      res.status(400).json({ error: 'HIP invalide' });
+      res.status(400).json({ error: 'HIP invalide', code: 'INVALID_HIP' });
       return;
     }
     const star = getDeepStarByHip(hip);
     if (!star) {
-      res.status(404).json({ error: 'Étoile introuvable' });
+      res.status(404).json({ error: 'Étoile introuvable', code: 'STAR_NOT_FOUND' });
       return;
     }
     res.json(star);

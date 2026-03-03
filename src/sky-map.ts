@@ -913,7 +913,7 @@ export class SkyMap {
         continue;
       }
 
-      ctx.fillText(info.nameFr.toUpperCase(), c.x, c.y);
+      ctx.fillText(info.displayName.toUpperCase(), c.x, c.y);
     }
 
     ctx.textAlign = 'start';

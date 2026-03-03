@@ -158,6 +158,180 @@ const FRENCH_NAMES = {
   'IC5146':  'Nébuleuse du Cocon',
 };
 
+// ─── English names for well-known objects ───────────────────────────────────
+const ENGLISH_NAMES = {
+  'M1':   'Crab Nebula',
+  'M2':   'Globular Cluster M2',
+  'M3':   'Globular Cluster M3',
+  'M4':   'Globular Cluster M4',
+  'M5':   'Globular Cluster M5',
+  'M6':   'Butterfly Cluster',
+  'M7':   "Ptolemy's Cluster",
+  'M8':   'Lagoon Nebula',
+  'M9':   'Globular Cluster M9',
+  'M10':  'Globular Cluster M10',
+  'M11':  'Wild Duck Cluster',
+  'M12':  'Globular Cluster M12',
+  'M13':  'Great Hercules Cluster',
+  'M14':  'Globular Cluster M14',
+  'M15':  'Globular Cluster M15',
+  'M16':  'Eagle Nebula',
+  'M17':  'Omega Nebula',
+  'M18':  'Open Cluster M18',
+  'M19':  'Globular Cluster M19',
+  'M20':  'Trifid Nebula',
+  'M21':  'Open Cluster M21',
+  'M22':  'Sagittarius Globular Cluster',
+  'M23':  'Open Cluster M23',
+  'M24':  'Sagittarius Star Cloud',
+  'M25':  'Open Cluster M25',
+  'M26':  'Open Cluster M26',
+  'M27':  'Dumbbell Nebula',
+  'M28':  'Globular Cluster M28',
+  'M29':  'Open Cluster M29',
+  'M30':  'Globular Cluster M30',
+  'M31':  'Andromeda Galaxy',
+  'M32':  'Andromeda Satellite Galaxy',
+  'M33':  'Triangulum Galaxy',
+  'M34':  'Open Cluster M34',
+  'M35':  'Open Cluster M35',
+  'M36':  'Auriga Cluster',
+  'M37':  'Open Cluster M37',
+  'M38':  'Open Cluster M38',
+  'M39':  'Open Cluster M39',
+  'M40':  'Winnecke 4',
+  'M41':  'Open Cluster M41',
+  'M42':  'Orion Nebula',
+  'M43':  "De Mairan's Nebula",
+  'M44':  'Beehive Cluster',
+  'M45':  'Pleiades',
+  'M46':  'Open Cluster M46',
+  'M47':  'Open Cluster M47',
+  'M48':  'Open Cluster M48',
+  'M49':  'Elliptical Galaxy M49',
+  'M50':  'Open Cluster M50',
+  'M51':  'Whirlpool Galaxy',
+  'M52':  'Open Cluster M52',
+  'M53':  'Globular Cluster M53',
+  'M54':  'Globular Cluster M54',
+  'M55':  'Globular Cluster M55',
+  'M56':  'Globular Cluster M56',
+  'M57':  'Ring Nebula',
+  'M58':  'Spiral Galaxy M58',
+  'M59':  'Elliptical Galaxy M59',
+  'M60':  'Elliptical Galaxy M60',
+  'M61':  'Spiral Galaxy M61',
+  'M62':  'Globular Cluster M62',
+  'M63':  'Sunflower Galaxy',
+  'M64':  'Black Eye Galaxy',
+  'M65':  'Spiral Galaxy M65',
+  'M66':  'Spiral Galaxy M66',
+  'M67':  'Open Cluster M67',
+  'M68':  'Globular Cluster M68',
+  'M69':  'Globular Cluster M69',
+  'M70':  'Globular Cluster M70',
+  'M71':  'Globular Cluster M71',
+  'M72':  'Globular Cluster M72',
+  'M73':  'Asterism M73',
+  'M74':  'Phantom Galaxy',
+  'M75':  'Globular Cluster M75',
+  'M76':  'Little Dumbbell Nebula',
+  'M77':  'Cetus Galaxy',
+  'M78':  'Reflection Nebula M78',
+  'M79':  'Globular Cluster M79',
+  'M80':  'Globular Cluster M80',
+  'M81':  "Bode's Galaxy",
+  'M82':  'Cigar Galaxy',
+  'M83':  'Southern Pinwheel Galaxy',
+  'M84':  'Elliptical Galaxy M84',
+  'M85':  'Spiral Galaxy M85',
+  'M86':  'Elliptical Galaxy M86',
+  'M87':  'Virgo Galaxy',
+  'M88':  'Spiral Galaxy M88',
+  'M89':  'Elliptical Galaxy M89',
+  'M90':  'Spiral Galaxy M90',
+  'M91':  'Spiral Galaxy M91',
+  'M92':  'Globular Cluster M92',
+  'M93':  'Open Cluster M93',
+  'M94':  'Spiral Galaxy M94',
+  'M95':  'Spiral Galaxy M95',
+  'M96':  'Spiral Galaxy M96',
+  'M97':  'Owl Nebula',
+  'M98':  'Spiral Galaxy M98',
+  'M99':  'Spiral Galaxy M99',
+  'M100': 'Spiral Galaxy M100',
+  'M101': 'Pinwheel Galaxy',
+  'M102': 'Spindle Galaxy',
+  'M103': 'Open Cluster M103',
+  'M104': 'Sombrero Galaxy',
+  'M105': 'Elliptical Galaxy M105',
+  'M106': 'Spiral Galaxy M106',
+  'M107': 'Globular Cluster M107',
+  'M108': 'Surfboard Galaxy',
+  'M109': 'Spiral Galaxy M109',
+  'M110': 'Dwarf Elliptical Galaxy M110',
+  // NGC objects
+  'NGC869':  'Double Cluster h Persei',
+  'NGC884':  'Double Cluster χ Persei',
+  'NGC1499': 'California Nebula',
+  'NGC1977': 'Emission Nebula NGC 1977',
+  'NGC2024': 'Flame Nebula',
+  'NGC2070': 'Tarantula Nebula',
+  'NGC2237': 'Rosette Nebula',
+  'NGC2244': 'Rosette Cluster',
+  'NGC2264': 'Christmas Tree Cluster',
+  'NGC3372': 'Carina Nebula',
+  'NGC4594': 'Sombrero Galaxy',
+  'NGC5128': 'Centaurus A Galaxy',
+  'NGC6357': 'Lobster Nebula',
+  'NGC6514': 'Trifid Nebula',
+  'NGC6523': 'Lagoon Nebula',
+  'NGC6618': 'Omega Nebula',
+  'NGC6611': 'Eagle Nebula',
+  'NGC6720': 'Ring Nebula',
+  'NGC6853': 'Dumbbell Nebula',
+  'NGC6992': 'Eastern Veil Nebula',
+  'NGC6960': 'Western Veil Nebula',
+  'NGC7000': 'North America Nebula',
+  'NGC7009': 'Saturn Nebula',
+  'NGC7293': 'Helix Nebula',
+  'NGC7331': 'Spiral Galaxy NGC 7331',
+  'NGC7789': "Caroline's Rose Cluster",
+  'IC434':   'Horsehead Nebula',
+  'IC1805':  'Heart Nebula',
+  'IC1848':  'Soul Nebula',
+  'IC2118':  'Witch Head Nebula',
+  'IC5070':  'Pelican Nebula',
+  'IC5146':  'Cocoon Nebula',
+};
+
+// English names for SH2 objects with French names
+const SH2_ENGLISH_NAMES = {
+  'SH2-27':  'Zeta Ophiuchi Nebula',
+  'SH2-86':  'NGC 6820 Nebula',
+  'SH2-101': 'Tulip Nebula',
+  'SH2-103': 'Cygnus Loop',
+  'SH2-106': 'SH2-106 Nebula',
+  'SH2-108': 'Crescent Nebula',
+  'SH2-125': 'Cocoon Nebula IC 5146',
+  'SH2-131': 'IC 1396 Nebula',
+  'SH2-142': 'Spider Nebula',
+  'SH2-147': 'Simeis 147 Nebula',
+  'SH2-155': 'Cave Nebula',
+  'SH2-185': 'IC 59/63 Nebula',
+  'SH2-190': 'Starfish Nebula',
+  'SH2-198': 'Heart Nebula IC 1805',
+  'SH2-199': 'Soul Nebula IC 1848',
+  'SH2-240': 'Pencil Nebula',
+  'SH2-252': 'Monkey Head Nebula',
+  'SH2-261': 'Octopus Nebula',
+  'SH2-264': 'Lambda Orionis Nebula',
+  'SH2-276': 'Extended Great Orion Nebula',
+  'SH2-279': 'Running Man Nebula',
+  'SH2-308': 'Zeta Puppis Starfish Nebula',
+  'SH2-311': 'NGC 2467 Nebula',
+};
+
 // ─── SH2 catalogue (integrated data block) ──────────────────────────────────
 // Format: [id, ra_deg, dec_deg, majAxis_arcmin, nameFr_or_null]
 const SH2_DATA = [
@@ -430,7 +604,10 @@ async function main() {
     let id = '';
     const catName = objName || catalog;
     if (catName.startsWith('NGC') || catName.startsWith('IC')) {
-      id = catName;
+      // Strip zero-padding: NGC0869 → NGC869, IC0010 → IC10
+      const prefix = catName.startsWith('NGC') ? 'NGC' : 'IC';
+      const num = parseInt(catName.slice(prefix.length), 10);
+      id = `${prefix}${num}`;
     } else {
       skipped++; continue;
     }
@@ -450,6 +627,8 @@ async function main() {
 
     // French name
     const nameFr = FRENCH_NAMES[primaryId] || FRENCH_NAMES[id] || null;
+    // English name
+    const nameEn = ENGLISH_NAMES[primaryId] || ENGLISH_NAMES[id] || null;
 
     // Convert arcminutes → arcminutes (majAxis is already in arcmin in OpenNGC)
     data.push([
@@ -462,12 +641,14 @@ async function main() {
       Math.round(pa),
       mag !== null ? Math.round(mag * 100) / 100 : null,
       nameFr,
+      nameEn,
     ]);
   }
 
   // Add SH2 objects
   for (const [id, ra, dec, majAxis, nameFr] of SH2_DATA) {
     if (dec < -35) continue;
+    const nameEn = SH2_ENGLISH_NAMES[id] || null;
     data.push([
       id,
       Math.round(ra * 1000) / 1000,
@@ -478,6 +659,7 @@ async function main() {
       0,
       null,
       nameFr,
+      nameEn,
     ]);
   }
 
@@ -494,7 +676,7 @@ async function main() {
   console.log(`Generated ${data.length} DSOs (skipped ${skipped})`);
 
   const output = {
-    fields: ['id', 'ra', 'dec', 'type', 'majAxis', 'minAxis', 'pa', 'mag', 'nameFr'],
+    fields: ['id', 'ra', 'dec', 'type', 'majAxis', 'minAxis', 'pa', 'mag', 'nameFr', 'nameEn'],
     data,
   };
 

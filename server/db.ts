@@ -27,17 +27,27 @@ db.exec(`
     photo_y REAL NOT NULL,
     star_hip INTEGER NOT NULL,
     star_name TEXT,
+    star_ra REAL,
+    star_dec REAL,
     UNIQUE(photo_id, point_index)
   );
 
   CREATE INDEX IF NOT EXISTS idx_corr_photo_id ON star_correspondences(photo_id);
 `);
 
+// Migration: add star_ra/star_dec columns if missing
+try {
+  db.exec('ALTER TABLE star_correspondences ADD COLUMN star_ra REAL');
+  db.exec('ALTER TABLE star_correspondences ADD COLUMN star_dec REAL');
+} catch {
+  // Columns already exist
+}
+
 const insertPhoto = db.prepare(
   'INSERT INTO photos (id, filename, original_name, width, height) VALUES (?, ?, ?, ?, ?)'
 );
 const insertCorrespondence = db.prepare(
-  'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip, star_name) VALUES (?, ?, ?, ?, ?, ?)'
+  'INSERT INTO star_correspondences (photo_id, point_index, photo_x, photo_y, star_hip, star_name, star_ra, star_dec) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
 );
 const selectPhotos = db.prepare('SELECT * FROM photos ORDER BY created_at DESC');
 const selectCorrespondences = db.prepare(
@@ -52,6 +62,8 @@ interface CorrespondenceInput {
   photoY: number;
   starHip: number;
   starName: string;
+  starRa?: number | null;
+  starDec?: number | null;
 }
 
 export function createPhoto(
@@ -65,7 +77,7 @@ export function createPhoto(
   const run = db.transaction(() => {
     insertPhoto.run(id, filename, originalName, width, height);
     for (const c of correspondences) {
-      insertCorrespondence.run(id, c.pointIndex, c.photoX, c.photoY, c.starHip, c.starName);
+      insertCorrespondence.run(id, c.pointIndex, c.photoX, c.photoY, c.starHip, c.starName, c.starRa ?? null, c.starDec ?? null);
     }
   });
   run();
@@ -90,6 +102,8 @@ export function getAllPhotos() {
         photoY: c.photo_y,
         starHip: c.star_hip,
         starName: c.star_name,
+        ...(c.star_ra != null ? { starRa: c.star_ra } : {}),
+        ...(c.star_dec != null ? { starDec: c.star_dec } : {}),
       })),
   }));
 }

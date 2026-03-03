@@ -1,6 +1,7 @@
 import type { Star, DSO, DSOSearchResult } from './types';
 import { getStars, getStarByHip } from './star-catalog';
 import { getDSOs } from './dso-catalog';
+import { t } from './i18n';
 
 export interface SearchResult {
   star: Star;
@@ -103,22 +104,14 @@ export function searchStars(query: string, limit = 10): SearchResult[] {
   return results.slice(0, limit);
 }
 
-const DSO_TYPE_NAMES: Record<string, string> = {
-  'Gx':  'Galaxie',
-  'OC':  'Amas ouvert',
-  'GC':  'Amas globulaire',
-  'EN':  'Nébuleuse en émission',
-  'RN':  'Nébuleuse par réflexion',
-  'PN':  'Nébuleuse planétaire',
-  'SNR': 'Rémanent de supernova',
-  'DN':  'Nébuleuse sombre',
-  '?':   'Objet céleste',
-};
+export function getDSOTypeName(type: string): string {
+  return t(`dso.types.${type}`) || t('dso.object');
+}
 
 function dsoLabel(dso: DSO): string {
-  const typeName = DSO_TYPE_NAMES[dso.type] || 'Objet';
-  if (dso.nameFr) {
-    return `${dso.id} – ${dso.nameFr}`;
+  const typeName = getDSOTypeName(dso.type);
+  if (dso.displayName) {
+    return `${dso.id} – ${dso.displayName}`;
   }
   return `${dso.id} (${typeName})`;
 }
@@ -132,7 +125,7 @@ export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
   for (const dso of getDSOs()) {
     let score = 0;
     const idLower = dso.id.toLowerCase();
-    const nameLower = dso.nameFr ? dso.nameFr.toLowerCase() : '';
+    const nameLower = dso.displayName ? dso.displayName.toLowerCase() : '';
 
     // 1. Exact ID match
     if (idLower === q) {
@@ -142,15 +135,15 @@ export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
     else if (idLower.startsWith(q)) {
       score = 90;
     }
-    // 3. Exact nameFr match
+    // 3. Exact name match
     else if (nameLower && nameLower === q) {
       score = 80;
     }
-    // 4. nameFr starts with query
+    // 4. Name starts with query
     else if (nameLower && nameLower.startsWith(q)) {
       score = 65;
     }
-    // 5. nameFr contains query
+    // 5. Name contains query
     else if (nameLower && nameLower.includes(q)) {
       score = 40;
     }
@@ -170,5 +163,3 @@ export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
   results.sort((a, b) => b.score - a.score);
   return results.slice(0, limit);
 }
-
-export { DSO_TYPE_NAMES };

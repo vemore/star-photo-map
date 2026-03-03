@@ -5,10 +5,24 @@ import { PhotoOverlay } from './photo-overlay';
 import { getPhotos } from './api';
 import { setupUI } from './ui';
 import { showToast } from './toast';
+import { getLang, t } from './i18n';
 import './style.css';
 
 async function init() {
+  // Set document language and title
+  document.documentElement.lang = getLang();
+  document.title = t('app.title');
+
+  // Set loading text and button text from translations
   const loadingOverlay = document.getElementById('loading-overlay');
+  const loadingText = loadingOverlay?.querySelector('.loading-text');
+  if (loadingText) loadingText.textContent = t('app.loading');
+
+  const addBtn = document.getElementById('add-photo-btn');
+  if (addBtn) addBtn.textContent = t('photos.add');
+
+  const togglePanel = document.getElementById('toggle-panel');
+  if (togglePanel) togglePanel.title = t('display.togglePanel');
 
   // Load star and DSO catalogs in parallel
   try {
@@ -16,7 +30,7 @@ async function init() {
   } catch (err: any) {
     // Show error in loading overlay instead of spinner
     if (loadingOverlay) {
-      loadingOverlay.innerHTML = `<div class="loading-error">${err.message || 'Erreur de chargement des catalogues'}</div>`;
+      loadingOverlay.innerHTML = `<div class="loading-error">${err.message || t('app.catalogError')}</div>`;
     }
     return;
   }
@@ -52,7 +66,7 @@ async function init() {
     const photos = await getPhotos();
     overlay.loadPhotos(photos);
   } catch {
-    showToast({ message: 'Impossible de charger les photos depuis le serveur', type: 'error' });
+    showToast({ message: t('app.photosLoadError'), type: 'error' });
   }
 }
 
