@@ -587,7 +587,7 @@ html, body {
   cursor: pointer;
   font-size: 12px;
   transition: background 0.2s;
-  white-space: nowrap;
+  text-align: center;
 }
 
 .btn-auto-solve:hover:not(:disabled) {
