@@ -19,30 +19,32 @@ function bvToRgb(bv: number): [number, number, number] {
   } else if (bv < 0.4) {
     const t = bv / 0.4;
     r = 1.0;
-    g = 1.0 - 0.1 * t;
-    b = 1.0 - 0.3 * t;
+    g = 1.0 - 0.08 * t;
+    b = 1.0 - 0.22 * t;
   } else if (bv < 0.8) {
     const t = (bv - 0.4) / 0.4;
     r = 1.0;
-    g = 0.9 - 0.3 * t;
-    b = 0.7 - 0.4 * t;
+    g = 0.92 - 0.14 * t;
+    b = 0.78 - 0.26 * t;
   } else if (bv < 1.2) {
     const t = (bv - 0.8) / 0.4;
     r = 1.0;
-    g = 0.6 - 0.2 * t;
-    b = 0.3 - 0.2 * t;
+    g = 0.78 - 0.11 * t;
+    b = 0.52 - 0.12 * t;
   } else {
     const t = Math.min((bv - 1.2) / 0.8, 1);
-    r = 1.0 - 0.3 * t;
-    g = 0.4 - 0.2 * t;
-    b = 0.1;
+    r = 1.0;
+    g = 0.67 - 0.09 * t;
+    b = 0.40 - 0.05 * t;
   }
 
   return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
 }
 
-function starRadius(mag: number): number {
-  return Math.max(0.5, 4 - mag * 0.6);
+function starRadius(mag: number, scale: number): number {
+  const base = Math.max(0.5, 3.5 - mag * 0.5);
+  const zoomFactor = Math.min(1, Math.sqrt(scale / 400));
+  return Math.max(0.3, base * zoomFactor);
 }
 
 function computeMaxMag(scale: number): number {
@@ -63,7 +65,7 @@ function angularSizeToCanvasPx(arcmin: number, decDeg: number, scale: number): n
 /** Position angle (E of celestial north) → angle on canvas */
 function dsoCanvasAngle(pa: number, raDeg: number): number {
   const raRad = raDeg * Math.PI / 180;
-  const northAngle = Math.atan2(Math.cos(raRad), Math.sin(raRad));
+  const northAngle = Math.atan2(Math.cos(raRad), -Math.sin(raRad));
   return northAngle - pa * Math.PI / 180;
 }
 
@@ -547,7 +549,7 @@ export class SkyMap {
       const raDeg = raH * 15;
       const raRad = raDeg * DEG2RAD;
 
-      const dx = -Math.sin(raRad);
+      const dx = Math.sin(raRad);
       const dy = Math.cos(raRad);
 
       ctx.beginPath();
@@ -617,7 +619,7 @@ export class SkyMap {
         continue;
       }
 
-      const radius = starRadius(star.mag);
+      const radius = starRadius(star.mag, view.scale);
       const [r, g, b] = bvToRgb(star.bv);
 
       // Glow for bright stars
@@ -656,7 +658,7 @@ export class SkyMap {
         continue;
       }
 
-      const r = starRadius(star.mag);
+      const r = starRadius(star.mag, view.scale);
       ctx.fillText(star.name, c.x + r + 3, c.y);
     }
 

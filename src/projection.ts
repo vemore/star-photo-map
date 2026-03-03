@@ -6,13 +6,13 @@ const RAD2DEG = 180 / Math.PI;
 /**
  * Stereographic polar projection: (RA°, Dec°) → projection (x, y).
  * North Celestial Pole at origin, equator at r=1.
- * RA increases clockwise (as seen from Earth looking up).
+ * RA increases counter-clockwise (standard sky chart orientation).
  */
 export function project(raDeg: number, decDeg: number): Point {
   const raRad = raDeg * DEG2RAD;
   const r = Math.tan((90 - decDeg) / 2 * DEG2RAD);
   return {
-    x: -r * Math.sin(raRad),
+    x: r * Math.sin(raRad),
     y: r * Math.cos(raRad),
   };
 }
@@ -21,7 +21,7 @@ export function project(raDeg: number, decDeg: number): Point {
 export function unproject(x: number, y: number): { ra: number; dec: number } {
   const r = Math.sqrt(x * x + y * y);
   const dec = 90 - 2 * Math.atan(r) * RAD2DEG;
-  let ra = Math.atan2(-x, y) * RAD2DEG;
+  let ra = Math.atan2(x, y) * RAD2DEG;
   if (ra < 0) ra += 360;
   return { ra, dec };
 }
