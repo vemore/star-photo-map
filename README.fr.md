@@ -28,11 +28,15 @@ L'utilisateur uploade une photo du ciel nocturne et l'application la positionne 
 - *Métadonnées WCS* — lecture directe depuis FITS/TIFF embarqués
 
 **Placement & alignement**
-- Placement manuel : photo semi-transparente draggable, curseurs rotation/zoom
+- Placement manuel : photo semi-transparente draggable, curseurs rotation/zoom, miroir X/Y
+- Placement 2 points (transformation de similarité) ou 3 points (affine)
+- Saisie directe de coordonnées RA/Déc en alternative à la recherche d'étoile
 - Fit affine par moindres carrés sur jusqu'à 9 étoiles de référence
 
-**Persistance**
+**Réglages & persistance**
 - Backend Express + SQLite, photos et correspondances stockées sur disque
+- Tous les paramètres d'affichage sauvegardés dans localStorage entre sessions
+- Opacité par défaut des photos et magnitude auto (adaptive au zoom) configurables
 
 ---
 

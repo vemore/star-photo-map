@@ -28,11 +28,15 @@ Users upload a photo of the night sky and the application automatically position
 - *WCS metadata* — direct read from embedded FITS/TIFF headers
 
 **Placement & alignment**
-- Manual placement: semi-transparent draggable photo, rotation/zoom sliders
+- Manual placement: semi-transparent draggable photo, rotation/zoom sliders, mirror X/Y
+- 2-point placement (similarity transform) or 3-point placement (affine)
+- Direct RA/Dec coordinate input as an alternative to star search
 - Least-squares affine fit on up to 9 reference stars
 
-**Persistence**
+**Settings & persistence**
 - Express backend + SQLite, photos and correspondences stored on disk
+- All display settings persisted in localStorage across sessions
+- Configurable default photo opacity and auto magnitude (zoom-adaptive)
 
 ---
 
