@@ -113,6 +113,14 @@ export interface DSOSearchResult {
   score: number;
 }
 
+export interface PhotoSection {
+  id: string;
+  name: string;
+  photoIds: string[];
+  collapsed: boolean;
+  visible: boolean;
+}
+
 export interface ManualPlacement {
   centerRa: number;
   centerDec: number;

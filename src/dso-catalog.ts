@@ -66,6 +66,16 @@ export function getDSOById(id: string): DSO | undefined {
   return dsoById.get(id.toUpperCase());
 }
 
+export type DSOCatalog = 'M' | 'NGC' | 'IC' | 'SH2';
+
+export function getDSOCatalog(id: string): DSOCatalog | null {
+  if (/^M\d/.test(id)) return 'M';
+  if (id.startsWith('NGC')) return 'NGC';
+  if (id.startsWith('IC')) return 'IC';
+  if (id.startsWith('SH2')) return 'SH2';
+  return null;
+}
+
 export function getDSOsNear(ra: number, dec: number, radiusDeg: number): DSO[] {
   // First pass: bounding box filter
   const decMin = dec - radiusDeg;

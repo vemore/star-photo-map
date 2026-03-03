@@ -1080,3 +1080,256 @@ input:focus-visible {
   outline: 2px solid rgba(80, 120, 255, 0.8);
   outline-offset: 0;
 }
+
+/* ─── Unified search type badges ─── */
+.search-item-type {
+  display: inline-block;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-right: 6px;
+  vertical-align: middle;
+}
+.search-item-type.star {
+  background: rgba(200, 170, 50, 0.25);
+  color: #ddc060;
+  border: 1px solid rgba(200, 170, 50, 0.35);
+}
+.search-item-type.dso {
+  background: rgba(60, 100, 200, 0.25);
+  color: #80b0ff;
+  border: 1px solid rgba(60, 100, 200, 0.35);
+}
+
+/* ─── Photo gear popup ─── */
+.photo-gear-popup {
+  position: fixed;
+  background: rgba(12, 12, 35, 0.98);
+  border: 1px solid rgba(80, 80, 160, 0.5);
+  border-radius: 8px;
+  padding: 12px;
+  z-index: 200;
+  min-width: 220px;
+  max-width: 280px;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 16px rgba(0, 0, 40, 0.6);
+}
+.photo-gear-popup-title {
+  font-size: 11px;
+  color: #88a;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 8px;
+}
+
+/* ─── Z-order list in gear popup ─── */
+.zorder-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 8px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+.zorder-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #99a;
+  background: rgba(20, 20, 50, 0.4);
+}
+.zorder-item.current {
+  background: rgba(60, 80, 160, 0.3);
+  color: #ccf;
+  border: 1px solid rgba(80, 100, 200, 0.4);
+}
+.zorder-item-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+}
+.zorder-grip {
+  cursor: grab;
+  color: #667;
+  font-size: 13px;
+  line-height: 1;
+  user-select: none;
+  flex-shrink: 0;
+  padding: 0 2px;
+}
+.zorder-grip:hover {
+  color: #99c;
+}
+.zorder-item.zorder-dragging {
+  z-index: 300;
+  box-shadow: 0 4px 12px rgba(0, 0, 40, 0.7);
+  opacity: 0.95;
+  cursor: grabbing;
+  pointer-events: none;
+}
+.zorder-item.zorder-dragging .zorder-grip {
+  cursor: grabbing;
+}
+.zorder-placeholder {
+  border: 1px dashed rgba(80, 100, 200, 0.4);
+  border-radius: 4px;
+  background: rgba(60, 80, 160, 0.1);
+}
+
+/* ─── Photo section actions ─── */
+.photo-section-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  padding: 6px 0;
+  user-select: none;
+}
+.photo-section-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 500;
+  color: #aab;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.photo-section-chevron {
+  font-size: 9px;
+  color: #88a;
+  transition: transform 0.2s;
+}
+.photo-section.collapsed .photo-section-chevron {
+  transform: rotate(-90deg);
+}
+.photo-section.collapsed .photo-section-items {
+  display: none;
+}
+.photo-section-eye {
+  background: none;
+  border: none;
+  color: #99a;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+.photo-section-eye:hover {
+  background: rgba(60, 60, 120, 0.3);
+}
+.photo-section-eye.hidden {
+  opacity: 0.4;
+}
+
+/* ─── New section row ─── */
+.new-section-row {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+.new-section-input {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  background: rgba(20, 20, 50, 0.8);
+  border: 1px solid rgba(60, 60, 120, 0.4);
+  border-radius: 4px;
+  color: #ccd;
+  font-size: 12px;
+  outline: none;
+}
+.new-section-input:focus {
+  border-color: rgba(80, 100, 200, 0.6);
+}
+.new-section-btn {
+  padding: 4px 10px;
+  background: rgba(60, 80, 160, 0.5);
+  border: 1px solid rgba(80, 100, 200, 0.4);
+  color: #bbc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.new-section-btn:hover {
+  background: rgba(70, 90, 180, 0.7);
+}
+
+/* ─── DSO catalog toggles ─── */
+.dso-catalog-toggles {
+  font-size: 12px;
+  margin-left: 20px;
+  margin-bottom: 10px;
+  padding-top: 6px;
+  border-top: 1px solid rgba(60, 60, 120, 0.15);
+}
+.dso-catalog-toggles-title {
+  font-size: 10px;
+  color: #77a;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-bottom: 4px;
+}
+
+/* ─── Gear popup sections ─── */
+.gear-popup-section {
+  margin-bottom: 10px;
+}
+.gear-popup-section:last-child {
+  margin-bottom: 0;
+}
+.gear-popup-label {
+  font-size: 11px;
+  color: #88a;
+  margin-bottom: 4px;
+}
+.gear-popup-slider {
+  width: 100%;
+  accent-color: rgba(80, 100, 200, 0.8);
+}
+.gear-popup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.gear-popup-move-btn {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  background: rgba(40, 40, 90, 0.5);
+  border: 1px solid rgba(80, 80, 140, 0.3);
+  color: #aab;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gear-popup-move-btn:hover {
+  background: rgba(60, 60, 140, 0.5);
+  color: #ccf;
+}
+.gear-popup-delete-btn {
+  width: 100%;
+  padding: 6px;
+  background: rgba(120, 30, 30, 0.3);
+  border: 1px solid rgba(180, 50, 50, 0.3);
+  color: #c88;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  margin-top: 4px;
+}
+.gear-popup-delete-btn:hover {
+  background: rgba(160, 40, 40, 0.4);
+  color: #e88;
+}

@@ -1,7 +1,7 @@
 import type { Star, DSO, ViewState, Point } from './types';
 import { project, toCanvas, fromCanvas, unproject } from './projection';
 import { getStars, getConstellationLines, getConstellationInfos } from './star-catalog';
-import { getDSOs } from './dso-catalog';
+import { getDSOs, getDSOCatalog } from './dso-catalog';
 import { SpatialIndex } from './spatial-index';
 
 const DEG2RAD = Math.PI / 180;
@@ -84,6 +84,7 @@ export class SkyMap {
   private showConstellationNames = true;
   private maxMagOverride: number | null = null;
   private visibleDSOTypes: Set<string> = new Set(['Gx', 'OC', 'GC', 'EN', 'RN', 'PN', 'SNR', 'DN', '?']);
+  private visibleDSOCatalogs: Set<string> = new Set(['M', 'NGC', 'IC', 'SH2']);
   private showGrid = true;
   private showStarLabels = true;
   private skyOpacity = 0.8;
@@ -144,6 +145,7 @@ export class SkyMap {
   setShowConstellationNames(show: boolean) { this.showConstellationNames = show; this.render(); }
   setMaxMag(mag: number | null) { this.maxMagOverride = mag; this.render(); }
   setVisibleDSOTypes(types: Set<string>) { this.visibleDSOTypes = types; this.dsoIndexMaxMag = -1; this.render(); }
+  setVisibleDSOCatalogs(catalogs: Set<string>) { this.visibleDSOCatalogs = catalogs; this.dsoIndexMaxMag = -1; this.render(); }
   setShowGrid(show: boolean) { this.showGrid = show; this.render(); }
   setShowStarLabels(show: boolean) { this.showStarLabels = show; this.render(); }
   setSkyOpacity(v: number) { this.skyOpacity = v; this.render(); }
@@ -165,6 +167,7 @@ export class SkyMap {
   }
 
   getShowGrid() { return this.showGrid; }
+  getEffectiveMaxMag(): number { return this.maxMagOverride ?? computeMaxMag(this.view.scale); }
 
   private cancelAnimation() {
     if (this.animationId !== null) {
@@ -282,6 +285,8 @@ export class SkyMap {
     this.dsoIndex.clear();
     for (const dso of getDSOs()) {
       if (!this.visibleDSOTypes.has(dso.type)) continue;
+      const cat = getDSOCatalog(dso.id);
+      if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
       if (dso.mag !== null && dso.mag > maxMag) continue;
       if (dso.mag === null && this.maxMagOverride !== null) continue;
       const p = project(dso.ra, dso.dec);
@@ -666,6 +671,8 @@ export class SkyMap {
 
     for (const dso of dsos) {
       if (!this.visibleDSOTypes.has(dso.type)) continue;
+      const cat = getDSOCatalog(dso.id);
+      if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
       if (dso.mag !== null && dso.mag > maxMag) continue;
       if (dso.mag === null && this.maxMagOverride !== null) continue;
 
@@ -867,6 +874,8 @@ export class SkyMap {
 
     for (const dso of dsos) {
       if (!this.visibleDSOTypes.has(dso.type)) continue;
+      const cat = getDSOCatalog(dso.id);
+      if (cat && !this.visibleDSOCatalogs.has(cat)) continue;
       if (dso.mag !== null && dso.mag > maxMag) continue;
       if (dso.mag === null && this.maxMagOverride !== null) continue;
 

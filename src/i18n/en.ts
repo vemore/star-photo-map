@@ -20,6 +20,25 @@ const en: Translations = {
     undo: 'Undo',
     deleteError: 'Delete error: {message}',
     placementError: 'Placement error: {name}',
+    settings: 'Settings',
+    opacity: 'Opacity',
+    zOrder: 'Display order',
+    sections: {
+      defaultName: 'Photos',
+      newSection: 'New group',
+      sectionName: 'Group name',
+      create: 'Create',
+      rename: 'Rename',
+      deleteSection: 'Delete group',
+      moveToSection: 'Move to',
+    },
+  },
+  search: {
+    section: 'Search',
+    placeholder: 'Search star or DSO\u2026',
+    typeStar: 'Star',
+    typeDSO: 'DSO',
+    noResults: 'No results',
   },
   stars: {
     section: 'Stars',
@@ -38,6 +57,13 @@ const en: Translations = {
     size: 'Size',
     raDec: 'RA / Dec',
     object: 'Object',
+    catalogs: 'Catalogs',
+    catalogLabels: {
+      M: 'Messier',
+      NGC: 'NGC',
+      IC: 'IC',
+      SH2: 'Sharpless',
+    },
     typeLabels: {
       Gx: 'Galaxies',
       OC: 'Open clusters',
@@ -72,6 +98,11 @@ const en: Translations = {
     skyOpacity: 'Sky opacity',
     backgroundGradient: 'Background gradient',
     togglePanel: 'Show/Hide panel',
+  },
+  settings: {
+    section: 'Settings',
+    defaultPhotoOpacity: 'Default photo opacity',
+    autoMagnitude: 'Auto magnitude (zoom)',
   },
   modal: {
     title: 'Add a photo to the map',

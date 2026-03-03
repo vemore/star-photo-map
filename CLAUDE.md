@@ -14,6 +14,27 @@ npm run preview      # Preview production build
 
 No test framework or linter is configured.
 
+## Browser Testing
+
+**Every code change must be verified in the browser before considering it done.** Use the Playwright MCP tools to test visually and interactively.
+
+### Workflow
+
+1. Start the dev server with `npm run dev` (runs Vite on port 5173 + Express on port 3001).
+2. Navigate to `http://localhost:5173` using `browser_navigate`.
+3. Take a snapshot (`browser_snapshot`) or screenshot (`browser_take_screenshot`) to verify the UI state.
+4. Interact with the app (click, type, etc.) to test the modified feature.
+5. Check the browser console (`browser_console_messages`) for errors or warnings.
+6. **Fix any bug found during testing**, even if unrelated to the current task.
+
+### What to verify
+
+- No console errors or unhandled exceptions.
+- UI renders correctly (layout, text, translations).
+- Interactive features work (buttons, modals, search, canvas pan/zoom).
+- Photos display and transform correctly on the sky map.
+- Both FR and EN languages render properly if i18n was touched.
+
 ## Architecture
 
 **Star Photo Map** is a web app for overlaying astrophotographs onto an interactive sky map. The frontend renders stars on an HTML5 Canvas using stereographic polar projection, while uploaded photos are positioned as DOM elements using CSS `transform: matrix()` computed from a 3-point affine registration.
@@ -51,7 +72,7 @@ Express 5 server with two files:
 
 ## Conventions
 
-- **All UI text is in French.** Constellation names use the `nameFr` field from constellations.json.
+- **UI text is internationalized (FR/EN).** French is the default language. Translations live in `src/i18n/fr.ts` and `src/i18n/en.ts`. Use `t('key')` for all user-facing strings. Constellation/DSO names use `displayName` (populated per-language at load time).
 - Vite proxies `/api` and `/uploads` to `http://localhost:3001` during dev.
 - Backend reads `PORT` env var (default 3001) and `DB_PATH` (default `./data.db`).
 - Uploaded photos go to `uploads/` directory on disk, named with UUIDs.

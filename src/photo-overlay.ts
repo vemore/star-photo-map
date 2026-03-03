@@ -52,6 +52,7 @@ export class PhotoOverlay {
   private skyMap: SkyMap | null;
   private onPhotosChanged: (() => void) | null = null;
   private affineErrorShown = new Set<string>();
+  private defaultOpacity = 1.0;
 
   constructor(container: HTMLDivElement, getView: () => ViewState, skyMap?: SkyMap) {
     this.container = container;
@@ -61,6 +62,10 @@ export class PhotoOverlay {
 
   setOnPhotosChanged(cb: () => void) {
     this.onPhotosChanged = cb;
+  }
+
+  setDefaultOpacity(v: number) {
+    this.defaultOpacity = v;
   }
 
   /** Load photos from server and display them */
@@ -241,6 +246,20 @@ export class PhotoOverlay {
     }
   }
 
+  setMultiplePhotosVisible(photoIds: string[], visible: boolean) {
+    const view = this.getView();
+    for (const id of photoIds) {
+      const placed = this.placedPhotos.find(p => p.photo.id === id);
+      if (!placed) continue;
+      placed.visible = visible;
+      placed.imgEl.style.display = visible ? 'block' : 'none';
+      if (visible) {
+        this.applyTransform(placed, view);
+      }
+    }
+    this.onPhotosChanged?.();
+  }
+
   movePhotoUp(photoId: string) {
     const idx = this.placedPhotos.findIndex(p => p.photo.id === photoId);
     if (idx < 0 || idx >= this.placedPhotos.length - 1) return;
@@ -253,6 +272,15 @@ export class PhotoOverlay {
     const idx = this.placedPhotos.findIndex(p => p.photo.id === photoId);
     if (idx <= 0) return;
     [this.placedPhotos[idx], this.placedPhotos[idx - 1]] = [this.placedPhotos[idx - 1], this.placedPhotos[idx]];
+    this.reorderDOM();
+    this.onPhotosChanged?.();
+  }
+
+  reorderPhoto(photoId: string, newIndex: number) {
+    const oldIdx = this.placedPhotos.findIndex(p => p.photo.id === photoId);
+    if (oldIdx < 0 || newIndex < 0 || newIndex >= this.placedPhotos.length || oldIdx === newIndex) return;
+    const [item] = this.placedPhotos.splice(oldIdx, 1);
+    this.placedPhotos.splice(newIndex, 0, item);
     this.reorderDOM();
     this.onPhotosChanged?.();
   }
@@ -316,8 +344,8 @@ export class PhotoOverlay {
     img.draggable = false;
     this.container.appendChild(img);
 
-    img.style.opacity = '0.7';
-    const placed: PlacedPhoto = { photo, imgEl: img, visible: true, opacity: 0.7 };
+    img.style.opacity = String(this.defaultOpacity);
+    const placed: PlacedPhoto = { photo, imgEl: img, visible: true, opacity: this.defaultOpacity };
     this.placedPhotos.push(placed);
 
     img.onload = () => {

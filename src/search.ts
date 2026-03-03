@@ -1,6 +1,8 @@
 import type { Star, DSO, DSOSearchResult } from './types';
 import { getStars, getStarByHip } from './star-catalog';
 import { getDSOs } from './dso-catalog';
+import { searchStarsAPI } from './api';
+import type { StarSearchResult } from './api';
 import { t } from './i18n';
 
 export interface SearchResult {
@@ -158,6 +160,55 @@ export function searchDSOs(query: string, limit = 10): DSOSearchResult[] {
       score += Math.max(0, (10 - mag) * 1.5);
       results.push({ dso, label: dsoLabel(dso), score });
     }
+  }
+
+  results.sort((a, b) => b.score - a.score);
+  return results.slice(0, limit);
+}
+
+export interface UnifiedSearchResult {
+  type: 'star' | 'dso';
+  label: string;
+  score: number;
+  mag: number;
+  ra: number;
+  dec: number;
+  star?: StarSearchResult;
+  dso?: DSO;
+}
+
+export async function searchUnified(query: string, limit = 15): Promise<UnifiedSearchResult[]> {
+  if (!query || query.length < 1) return [];
+
+  const [starResults, dsoResults] = await Promise.all([
+    searchStarsAPI(query, 8),
+    Promise.resolve(searchDSOs(query, 8)),
+  ]);
+
+  const results: UnifiedSearchResult[] = [];
+
+  for (const s of starResults) {
+    results.push({
+      type: 'star',
+      label: s.label,
+      score: s.score,
+      mag: s.mag,
+      ra: s.ra,
+      dec: s.dec,
+      star: s,
+    });
+  }
+
+  for (const d of dsoResults) {
+    results.push({
+      type: 'dso',
+      label: d.label,
+      score: d.score,
+      mag: d.dso.mag ?? 99,
+      ra: d.dso.ra,
+      dec: d.dso.dec,
+      dso: d.dso,
+    });
   }
 
   results.sort((a, b) => b.score - a.score);
